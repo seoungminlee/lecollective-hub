@@ -289,7 +289,7 @@
 // ============================================================
 const SUPABASE_URL = 'https://lwcutgofpdtzcbyjszhc.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx3Y3V0Z29mcGR0emNieWpzemhjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIxMzg0ODAsImV4cCI6MjA5NzcxNDQ4MH0.g2eGcEiO8Ix0Cul9wqnNghbn5snCeqjwD9LiD_-mK6I';
-const APP_VERSION = 'hub-v1.0';
+const APP_VERSION = 'hub-v1.0.1'; // 수정: 관리 탭 표시 버그, 한글 파일 업로드 실패
 const DOC_CATEGORIES = ['계약·협약','정산·비용','인수인계','매뉴얼·양식','기타'];
 const DOC_BUCKET = 'hub-docs';
 
@@ -353,7 +353,10 @@ function enterApp(){
   const roleLabel = CURRENT_ROLE === 'admin' ? '관리자' : CURRENT_ROLE === 'staff' ? '직원' : '열람전용';
   document.getElementById('userChip').textContent = '👤 ' + name + ' · ' + roleLabel;
   if(CURRENT_ROLE === 'admin'){
-    document.querySelectorAll('.admin-only').forEach(el => el.style.display = '');
+    // 주의: style.display='' 는 CSS의 display:none을 이기지 못함 → 명시적으로 지정
+    document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'block');
+  } else {
+    document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none');
   }
   renderDocChips();
   loadDocs();
@@ -428,8 +431,10 @@ async function uploadDoc(input){
   const cat = input.dataset.cat || '기타';
   if(file.size > 25*1024*1024){ toast('25MB 이하 파일만 업로드할 수 있습니다.'); input.value=''; return; }
   toast('업로드 중…');
-  const safe = file.name.replace(/[^\w.\-가-힣 ]/g, '_');
-  const path = Date.now() + '_' + safe;
+  // 저장 경로는 영문·숫자만 사용 (스토리지가 한글 경로를 거부함) — 원본 파일명은 DB에 따로 저장되어 화면에 표시됨
+  const extMatch = file.name.match(/\.([A-Za-z0-9]{1,8})$/);
+  const ext = extMatch ? extMatch[1].toLowerCase() : 'bin';
+  const path = Date.now() + '_' + Math.random().toString(36).slice(2, 8) + '.' + ext;
   const { error: upErr } = await sb.storage.from(DOC_BUCKET).upload(path, file);
   if(upErr){ toast('업로드 실패: ' + upErr.message); input.value=''; return; }
   const { error: dbErr } = await sb.from('hub_documents').insert({
