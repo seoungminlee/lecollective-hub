@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.supabase.co; connect-src 'self' https://*.supabase.co wss://*.supabase.co; frame-src 'self' data: blob: https://*.supabase.co; object-src 'none'; base-uri 'self'; form-action 'self';">
+<title>르컬렉티브 시흥 웨이브파크 — 통합 대시보드</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --navy:#1e2a44; --navy-2:#2b3a5c; --accent:#3b82f6; --accent-2:#0ea5e9;
+    --bg:#f4f6fa; --card:#ffffff; --line:#e4e8f0; --txt:#1f2937; --sub:#6b7280;
+    --green:#10b981; --amber:#f59e0b; --red:#ef4444; --violet:#8b5cf6;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',sans-serif;}
+  body{background:var(--bg);color:var(--txt);}
+
+  /* ── 로그인 화면 ── */
+  #loginScreen{position:fixed;inset:0;background:linear-gradient(160deg,var(--navy) 0%,#31456e 100%);display:flex;align-items:center;justify-content:center;z-index:100;padding:20px;}
+  .login-box{background:#fff;border-radius:18px;padding:36px 32px;width:100%;max-width:400px;box-shadow:0 20px 60px rgba(0,0,0,.3);}
+  .login-box .logo-row{display:flex;align-items:center;gap:12px;margin-bottom:8px;}
+  .login-box .logo{width:42px;height:42px;border-radius:11px;background:linear-gradient(135deg,var(--accent),var(--accent-2));display:flex;align-items:center;justify-content:center;font-weight:800;font-size:17px;color:#fff;}
+  .login-box h1{font-size:18px;letter-spacing:-.3px;}
+  .login-box h1 small{display:block;font-size:12px;color:var(--sub);font-weight:400;margin-top:2px;}
+  .login-box label{display:block;font-size:12.5px;color:var(--sub);margin:16px 0 6px;font-weight:600;}
+  .login-box input{width:100%;padding:12px 14px;border:1.5px solid var(--line);border-radius:10px;font-size:14px;}
+  .login-box input:focus{outline:none;border-color:var(--accent);}
+  .login-box .btn-login{width:100%;margin-top:22px;background:var(--navy);color:#fff;border:none;padding:13px;border-radius:10px;font-size:14.5px;font-weight:700;cursor:pointer;}
+  .login-box .btn-login:disabled{opacity:.6;cursor:wait;}
+  #loginErr{color:var(--red);font-size:12.5px;min-height:18px;margin-top:10px;}
+  .login-note{font-size:11.5px;color:var(--sub);margin-top:16px;line-height:1.7;text-align:center;}
+
+  /* ── 비밀번호 변경 강제 화면 ── */
+  #pwChangeScreen{display:none;position:fixed;inset:0;background:rgba(30,42,68,.97);z-index:110;align-items:center;justify-content:center;padding:20px;}
+
+  /* ── 상단 헤더 ── */
+  header{background:var(--navy);color:#fff;padding:0 24px;display:flex;align-items:center;justify-content:space-between;height:60px;position:sticky;top:0;z-index:50;}
+  .brand{display:flex;align-items:center;gap:12px;}
+  .brand .logo{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,var(--accent),var(--accent-2));display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;}
+  .brand h1{font-size:16px;font-weight:700;letter-spacing:-.3px;}
+  .brand small{display:block;font-size:11px;color:#9db0d0;font-weight:400;}
+  .user-area{display:flex;align-items:center;gap:10px;font-size:13px;}
+  .user-chip{background:var(--navy-2);padding:6px 12px;border-radius:20px;color:#c9d6ee;font-size:12.5px;}
+  .btn-ghost{background:transparent;border:1px solid #47597e;color:#c9d6ee;padding:6px 12px;border-radius:8px;font-size:12px;cursor:pointer;}
+  .btn-ghost:hover{background:var(--navy-2);}
+
+  nav{background:#fff;border-bottom:1px solid var(--line);padding:0 24px;display:flex;gap:4px;position:sticky;top:60px;z-index:40;overflow-x:auto;}
+  nav button{border:none;background:none;padding:14px 16px;font-size:14px;color:var(--sub);cursor:pointer;border-bottom:2.5px solid transparent;white-space:nowrap;font-weight:500;}
+  nav button.on{color:var(--accent);border-bottom-color:var(--accent);font-weight:700;}
+
+  main{max-width:1200px;margin:0 auto;padding:24px 20px 60px;}
+  .tabpane{display:none;} .tabpane.on{display:block;}
+
+  .sec-title{font-size:15px;font-weight:700;margin:28px 0 12px;display:flex;align-items:center;gap:8px;}
+  .sec-title:first-child{margin-top:4px;}
+  .sec-title .dot{width:8px;height:8px;border-radius:50%;}
+  .sec-title .tag{font-size:11px;font-weight:500;color:var(--sub);background:#eef1f6;padding:3px 8px;border-radius:10px;}
+
+  .dash-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px;}
+  .dash-card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px;box-shadow:0 1px 3px rgba(30,42,68,.06);}
+  .dash-card.ghost{border-style:dashed;background:transparent;box-shadow:none;display:flex;align-items:center;justify-content:center;min-height:200px;color:var(--sub);font-size:13px;text-align:center;line-height:1.7;}
+  .dash-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;gap:10px;}
+  .dash-head .name{font-size:16px;font-weight:700;}
+  .dash-head .name small{display:block;font-size:11.5px;color:var(--sub);font-weight:400;margin-top:3px;}
+  .go-btn{background:var(--accent);color:#fff;border:none;padding:8px 14px;border-radius:9px;font-size:12.5px;font-weight:600;cursor:pointer;flex-shrink:0;text-decoration:none;display:inline-block;}
+  .go-btn.gray{background:#cbd5e1;cursor:default;}
+  .kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px;}
+  .kpi{background:#f8fafc;border:1px solid var(--line);border-radius:10px;padding:10px 8px;text-align:center;}
+  .kpi .v{font-size:19px;font-weight:800;color:#94a3b8;}
+  .kpi .k{font-size:10.5px;color:var(--sub);margin-top:4px;line-height:1.35;}
+  .chart-slot{border:1.5px dashed #cbd5e1;border-radius:10px;height:100px;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:12px;background:#fafbfd;}
+  .status-line{margin-top:10px;font-size:11.5px;color:var(--sub);display:flex;gap:6px;align-items:center;flex-wrap:wrap;}
+  .pulse{width:7px;height:7px;border-radius:50%;background:var(--green);}
+  .pulse.off{background:#cbd5e1;}
+
+  /* ── 문서보관소 ── */
+  .doc-toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;align-items:center;}
+  .chip{background:#fff;border:1px solid var(--line);padding:7px 14px;border-radius:20px;font-size:12.5px;color:var(--sub);cursor:pointer;}
+  .chip.on{background:var(--navy);color:#fff;border-color:var(--navy);}
+  .upload-btn{margin-left:auto;background:var(--navy);color:#fff;border:none;padding:8px 16px;border-radius:9px;font-size:12.5px;cursor:pointer;}
+  table{width:100%;background:#fff;border:1px solid var(--line);border-radius:12px;border-collapse:separate;border-spacing:0;overflow:hidden;font-size:13px;}
+  th{background:#f8fafc;text-align:left;padding:11px 14px;color:var(--sub);font-size:12px;font-weight:600;border-bottom:1px solid var(--line);}
+  td{padding:12px 14px;border-bottom:1px solid #f1f4f8;}
+  tr:last-child td{border-bottom:none;}
+  .tbl-btn{border:1px solid var(--line);background:#fff;border-radius:7px;padding:5px 10px;font-size:12px;cursor:pointer;color:var(--accent);}
+  .tbl-btn.danger{color:var(--red);}
+  .empty-row{color:#94a3b8;text-align:center;padding:24px !important;}
+
+  /* ── 주기업무 ── */
+  .duty-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+  .duty-card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:18px;}
+  .duty-card h3{font-size:14px;margin-bottom:12px;display:flex;align-items:center;gap:8px;}
+  .duty-item{display:flex;align-items:center;gap:10px;padding:10px 4px;border-bottom:1px solid #f1f4f8;font-size:13px;}
+  .duty-item:last-child{border-bottom:none;}
+  .duty-item.done .title{text-decoration:line-through;color:#94a3b8;}
+  .duty-item .who{font-size:11px;color:var(--sub);}
+  .cbx{width:18px;height:18px;border:1.5px solid #cbd5e1;border-radius:5px;flex-shrink:0;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px;background:#fff;}
+  .cbx.checked{background:var(--green);border-color:var(--green);color:#fff;}
+  .badge{font-size:10.5px;padding:2px 8px;border-radius:8px;margin-left:auto;flex-shrink:0;}
+  .badge.m{background:#eff6ff;color:var(--accent);}
+  .badge.y{background:#f5f3ff;color:var(--violet);}
+
+  /* ── 관리 ── */
+  .admin-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;}
+  .admin-card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:18px;font-size:13px;}
+  .admin-card h3{font-size:13.5px;margin-bottom:10px;}
+  .admin-card p{color:var(--sub);font-size:12px;line-height:1.6;}
+  .admin-card input,.admin-card select{padding:8px 10px;border:1.5px solid var(--line);border-radius:8px;font-size:12.5px;margin:4px 4px 4px 0;}
+  .admin-card .btn-sm{background:var(--navy);color:#fff;border:none;padding:8px 14px;border-radius:8px;font-size:12px;cursor:pointer;}
+
+  .placeholder-note{font-size:11.5px;color:#b45309;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:8px 12px;margin-bottom:14px;display:inline-block;}
+  footer{text-align:center;color:#9ca3af;font-size:11.5px;padding:26px 0;line-height:1.8;}
+  .admin-only{display:none;}
+  #appRoot{display:none;}
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;padding:11px 20px;border-radius:10px;font-size:13px;z-index:200;box-shadow:0 8px 24px rgba(0,0,0,.25);display:none;}
+
+  @media (max-width:720px){
+    .kpi-row{grid-template-columns:repeat(2,1fr);}
+    .duty-grid{grid-template-columns:1fr;}
+    .brand h1{font-size:13.5px;}
+    nav{padding:0 10px;}
+    .upload-btn{margin-left:0;}
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══════════ 로그인 화면 ═══════════ -->
+<div id="loginScreen">
+  <div class="login-box">
+    <div class="logo-row">
+      <div class="logo">LC</div>
+      <h1>르컬렉티브 시흥 웨이브파크<small>지점 통합 대시보드</small></h1>
+    </div>
+    <label>이메일</label>
+    <input type="email" id="loginEmail" placeholder="name@handys.co.kr" autocomplete="username">
+    <label>비밀번호</label>
+    <input type="password" id="loginPassword" placeholder="비밀번호" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
+    <button class="btn-login" id="loginBtn" onclick="doLogin()">로그인</button>
+    <div id="loginErr"></div>
+    <div class="login-note">계정은 하자관리 시스템과 공통입니다.<br>계정 문의: 관리자 (이성민)</div>
+  </div>
+</div>
+
+<!-- ═══════════ 비밀번호 변경 강제 화면 ═══════════ -->
+<div id="pwChangeScreen">
+  <div class="login-box">
+    <h1 style="font-size:16px;">🔑 비밀번호 변경 필요<small>초기화된 계정입니다. 새 비밀번호를 설정해주세요.</small></h1>
+    <label>새 비밀번호 (8자 이상, 영문+숫자)</label>
+    <input type="password" id="newPw1" autocomplete="new-password">
+    <label>새 비밀번호 확인</label>
+    <input type="password" id="newPw2" autocomplete="new-password">
+    <button class="btn-login" onclick="doChangePw()">변경하고 시작하기</button>
+    <div id="pwErr" style="color:var(--red);font-size:12.5px;min-height:18px;margin-top:10px;"></div>
+  </div>
+</div>
+
+<!-- ═══════════ 본 화면 ═══════════ -->
+<div id="appRoot">
+<header>
+  <div class="brand">
+    <div class="logo">LC</div>
+    <div><h1>르컬렉티브 시흥 웨이브파크 <small>지점 통합 대시보드</small></h1></div>
+  </div>
+  <div class="user-area">
+    <span class="user-chip" id="userChip">👤 —</span>
+    <button class="btn-ghost" onclick="doLogout()">로그아웃</button>
+  </div>
+</header>
+
+<nav>
+  <button class="on" data-tab="home" onclick="switchTab('home',this)">🏠 홈 (운영 현황)</button>
+  <button data-tab="docs" onclick="switchTab('docs',this)">📁 문서보관소</button>
+  <button data-tab="duty" onclick="switchTab('duty',this)">📅 주기업무</button>
+  <button data-tab="admin" class="admin-only" onclick="switchTab('admin',this)">⚙️ 관리</button>
+</nav>
+
+<main>
+
+  <!-- 탭 1: 홈 -->
+  <div class="tabpane on" id="home">
+    <div class="sec-title"><span class="dot" style="background:var(--amber)"></span> 시설관리 <span class="tag">담당 직군: 시설/객실</span></div>
+    <div class="dash-grid">
+      <div class="dash-card">
+        <div class="dash-head">
+          <div class="name">🔧 하자관리 시스템 <small>M3 · 객실 하자 · 부품재고 · 처리비용</small></div>
+          <a class="go-btn" href="https://seoungminlee.github.io/room-defect-dashboard/" target="_blank" rel="noopener">바로가기 →</a>
+        </div>
+        <div class="kpi-row">
+          <div class="kpi"><div class="v">—</div><div class="k">지표 ①<br>(추후 확정)</div></div>
+          <div class="kpi"><div class="v">—</div><div class="k">지표 ②<br>(추후 확정)</div></div>
+          <div class="kpi"><div class="v">—</div><div class="k">지표 ③<br>(추후 확정)</div></div>
+          <div class="kpi"><div class="v">—</div><div class="k">지표 ④<br>(추후 확정)</div></div>
+        </div>
+        <div class="chart-slot">📊 그래프 영역 — 표시 항목 사용자 의견 취합 후 확정</div>
+        <div class="status-line"><span class="pulse"></span> 운영중 · 요약 지표는 항목 확정 후 연결 <span style="margin-left:auto">※ 세탁비·청소비·통신비 제외</span></div>
+      </div>
+    </div>
+
+    <div class="sec-title"><span class="dot" style="background:var(--green)"></span> 편의점 운영 <span class="tag">담당 직군: 편의점</span></div>
+    <div class="dash-grid">
+      <div class="dash-card">
+        <div class="dash-head">
+          <div class="name">🏪 편의점 수익관리 <small>M4 · 매출 현황 · 품목 분석 · 폐기 현황</small></div>
+          <span class="go-btn gray">구축 예정</span>
+        </div>
+        <div class="kpi-row">
+          <div class="kpi"><div class="v">—</div><div class="k">지표 ①<br>(추후 확정)</div></div>
+          <div class="kpi"><div class="v">—</div><div class="k">지표 ②<br>(추후 확정)</div></div>
+          <div class="kpi"><div class="v">—</div><div class="k">지표 ③<br>(추후 확정)</div></div>
+          <div class="kpi"><div class="v">—</div><div class="k">지표 ④<br>(추후 확정)</div></div>
+        </div>
+        <div class="chart-slot">📊 그래프 영역 — M4 구축 시 연결</div>
+        <div class="status-line"><span class="pulse off"></span> 구축 예정 (Phase 3)</div>
+      </div>
+    </div>
+
+    <div class="sec-title"><span class="dot" style="background:#94a3b8"></span> 확장 슬롯 <span class="tag">추후 자 대시보드 추가 영역</span></div>
+    <div class="dash-grid">
+      <div class="dash-card ghost">＋ 새 대시보드 자리<br>직군(섹션) 단위로 계속 추가되는 구조</div>
+    </div>
+  </div>
+
+  <!-- 탭 2: 문서보관소 -->
+  <div class="tabpane" id="docs">
+    <div class="doc-toolbar" id="docChips"></div>
+    <input type="file" id="docFile" style="display:none" onchange="uploadDoc(this)">
+    <table>
+      <thead><tr><th style="width:42%">문서명</th><th>분류</th><th>등록자</th><th>등록일</th><th style="width:120px"></th></tr></thead>
+      <tbody id="docBody"><tr><td colspan="5" class="empty-row">불러오는 중…</td></tr></tbody>
+    </table>
+    <p style="font-size:11.5px;color:var(--sub);margin-top:10px;">🔒 문서는 비공개 저장소에 보관되며, 열람 시 10분간만 유효한 보안 링크로 열립니다.</p>
+  </div>
+
+  <!-- 탭 3: 주기업무 -->
+  <div class="tabpane" id="duty">
+    <div class="placeholder-note" id="dutyNote" style="display:none;">아직 등록된 주기업무가 없습니다 — 관리 탭에서 항목을 추가하세요 (관리자)</div>
+    <div class="duty-grid">
+      <div class="duty-card">
+        <h3>📆 이번 달 주기업무 <span class="badge m" id="dutyMonthLabel">월간</span></h3>
+        <div id="dutyMonthly"></div>
+      </div>
+      <div class="duty-card">
+        <h3>🗓 연간 주기업무 <span class="badge y" id="dutyYearLabel">연간</span></h3>
+        <div id="dutyYearly"></div>
+      </div>
+    </div>
+    <p style="font-size:11.5px;color:var(--sub);margin-top:12px;">체크하면 완료자와 일시가 기록됩니다. 매월/매년 자동으로 새 체크리스트가 시작됩니다.</p>
+  </div>
+
+  <!-- 탭 4: 관리 (admin 전용) -->
+  <div class="tabpane" id="admin">
+    <div class="admin-grid">
+      <div class="admin-card">
+        <h3>📅 주기업무 항목 관리</h3>
+        <input id="newDutyTitle" placeholder="업무명 (예: 소방설비 점검)" style="width:100%;">
+        <div>
+          <select id="newDutyCycle"><option value="monthly">매월</option><option value="yearly">연간</option></select>
+          <input id="newDutyLabel" placeholder="시기 표시 (예: 매월 5일 / 1월)" style="width:140px;">
+          <button class="btn-sm" onclick="addDuty()">추가</button>
+        </div>
+        <div id="dutyAdminList" style="margin-top:10px;font-size:12.5px;"></div>
+      </div>
+      <div class="admin-card">
+        <h3>👥 사용자 관리</h3>
+        <p>계정 초대·권한 변경·비밀번호 초기화는 현재 <b>하자관리 시스템 → 관리자 탭</b>에서 수행합니다. (로그인 일원화 단계에서 이곳으로 이전 예정)</p>
+        <a class="btn-sm" style="display:inline-block;margin-top:8px;text-decoration:none;" href="https://seoungminlee.github.io/room-defect-dashboard/" target="_blank" rel="noopener">하자관리 관리자 탭 열기 →</a>
+      </div>
+      <div class="admin-card">
+        <h3>🔐 보안 · 💾 백업</h3>
+        <p>MFA(2단계 인증)와 자동 백업 현황 표시는 다음 단계(보안 강화·백업 자동화)에서 이 자리에 연결됩니다.</p>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<footer>
+  르컬렉티브 시흥 웨이브파크 통합 대시보드 · <span id="verLabel"></span><br>
+  로그인 없이는 어떤 데이터도 표시되지 않습니다 · 문의: 이성민
+</footer>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ============================================================
+// 설정 — 하자관리 시스템(M3)과 같은 Supabase 프로젝트 (계정 공통)
+// ============================================================
+const SUPABASE_URL = 'https://lwcutgofpdtzcbyjszhc.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx3Y3V0Z29mcGR0emNieWpzemhjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIxMzg0ODAsImV4cCI6MjA5NzcxNDQ4MH0.g2eGcEiO8Ix0Cul9wqnNghbn5snCeqjwD9LiD_-mK6I';
+const APP_VERSION = 'hub-v1.0';
+const DOC_CATEGORIES = ['계약·협약','정산·비용','인수인계','매뉴얼·양식','기타'];
+const DOC_BUCKET = 'hub-docs';
+
+let sb = null, CURRENT_USER = null, CURRENT_ROLE = 'viewer';
+let docFilter = '전체';
+
+document.getElementById('verLabel').textContent = APP_VERSION + ' (' + new Date().getFullYear() + ')';
+
+// ============================================================
+// 초기화 · 세션 (M3와 동일 패턴 — 같은 브라우저면 세션 자동 공유)
+// ============================================================
+window.addEventListener('DOMContentLoaded', () => {
+  sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  sb.auth.getSession().then(async ({ data: { session } }) => {
+    if(session){
+      const { data: userData } = await sb.auth.getUser();
+      onLoginSuccess(userData?.user || session.user);
+    }
+  });
+  sb.auth.onAuthStateChange((event, session) => {
+    if(event === 'SIGNED_OUT' || !session){ onLogout(); }
+  });
+});
+
+async function doLogin(){
+  const email = document.getElementById('loginEmail').value.trim();
+  const pw = document.getElementById('loginPassword').value;
+  const errEl = document.getElementById('loginErr');
+  const btn = document.getElementById('loginBtn');
+  if(!email || !pw){ errEl.textContent = '이메일과 비밀번호를 입력해주세요.'; return; }
+  btn.disabled = true; btn.textContent = '로그인 중…'; errEl.textContent = '';
+  const { data, error } = await sb.auth.signInWithPassword({ email, password: pw });
+  btn.disabled = false; btn.textContent = '로그인';
+  if(error){
+    errEl.textContent = '로그인 실패: ' + (error.message === 'Invalid login credentials' ? '이메일 또는 비밀번호가 올바르지 않습니다.' : error.message);
+    return;
+  }
+  onLoginSuccess(data.user);
+}
+
+function onLoginSuccess(user){
+  CURRENT_USER = user;
+  // role은 app_metadata가 유일한 출처 (M3 v19 원칙과 동일)
+  const _r = user?.app_metadata?.role;
+  CURRENT_ROLE = _r === 'admin' ? 'admin' : _r === 'staff' ? 'staff' : 'viewer';
+
+  // 초기화된 계정 → 비밀번호 변경 강제 (M3와 동일 정책)
+  if(user?.user_metadata?.must_change_pw){
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('pwChangeScreen').style.display = 'flex';
+    return;
+  }
+  enterApp();
+}
+
+function enterApp(){
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('pwChangeScreen').style.display = 'none';
+  document.getElementById('appRoot').style.display = 'block';
+  const name = CURRENT_USER?.user_metadata?.display_name || CURRENT_USER?.user_metadata?.full_name || CURRENT_USER?.email || '';
+  const roleLabel = CURRENT_ROLE === 'admin' ? '관리자' : CURRENT_ROLE === 'staff' ? '직원' : '열람전용';
+  document.getElementById('userChip').textContent = '👤 ' + name + ' · ' + roleLabel;
+  if(CURRENT_ROLE === 'admin'){
+    document.querySelectorAll('.admin-only').forEach(el => el.style.display = '');
+  }
+  renderDocChips();
+  loadDocs();
+  loadDuties();
+}
+
+async function doChangePw(){
+  const p1 = document.getElementById('newPw1').value;
+  const p2 = document.getElementById('newPw2').value;
+  const err = document.getElementById('pwErr');
+  if(p1 !== p2){ err.textContent = '두 비밀번호가 일치하지 않습니다.'; return; }
+  if(!/^(?=.*[A-Za-z])(?=.*\d).{8,}$/.test(p1)){ err.textContent = '8자 이상, 영문과 숫자를 모두 포함해야 합니다.'; return; }
+  const { error } = await sb.auth.updateUser({ password: p1, data: { must_change_pw: false } });
+  if(error){ err.textContent = '변경 실패: ' + error.message; return; }
+  if(CURRENT_USER) CURRENT_USER.user_metadata = { ...CURRENT_USER.user_metadata, must_change_pw: false };
+  enterApp();
+}
+
+async function doLogout(){ await sb.auth.signOut(); }
+
+function onLogout(){
+  CURRENT_USER = null; CURRENT_ROLE = 'viewer';
+  document.getElementById('appRoot').style.display = 'none';
+  document.getElementById('pwChangeScreen').style.display = 'none';
+  document.getElementById('loginScreen').style.display = 'flex';
+  document.getElementById('loginPassword').value = '';
+}
+
+// ============================================================
+// 공통
+// ============================================================
+function switchTab(id, btn){
+  document.querySelectorAll('nav button').forEach(x=>x.classList.remove('on'));
+  document.querySelectorAll('.tabpane').forEach(x=>x.classList.remove('on'));
+  btn.classList.add('on');
+  document.getElementById(id).classList.add('on');
+}
+function esc(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.style.display = 'block';
+  clearTimeout(t._h); t._h = setTimeout(()=>{ t.style.display='none'; }, 2600);
+}
+function canEdit(){ return CURRENT_ROLE === 'admin' || CURRENT_ROLE === 'staff'; }
+function myName(){ return CURRENT_USER?.user_metadata?.display_name || CURRENT_USER?.user_metadata?.full_name || CURRENT_USER?.email || '알 수 없음'; }
+function fmtDate(iso){ if(!iso) return '—'; const d = new Date(iso); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+
+// ============================================================
+// 문서보관소
+// ============================================================
+function renderDocChips(){
+  const box = document.getElementById('docChips');
+  let html = ['전체', ...DOC_CATEGORIES].map(c =>
+    `<span class="chip ${docFilter===c?'on':''}" onclick="docFilter='${c}';renderDocChips();loadDocs();">${c}</span>`).join('');
+  if(canEdit()){
+    html += `<button class="upload-btn" onclick="pickDoc()">＋ 문서 업로드</button>`;
+  }
+  box.innerHTML = html;
+}
+
+function pickDoc(){
+  const cat = prompt('문서 분류를 입력하세요:\n' + DOC_CATEGORIES.join(' / '), DOC_CATEGORIES[0]);
+  if(cat === null) return;
+  const c = DOC_CATEGORIES.includes(cat.trim()) ? cat.trim() : '기타';
+  document.getElementById('docFile').dataset.cat = c;
+  document.getElementById('docFile').click();
+}
+
+async function uploadDoc(input){
+  const file = input.files[0];
+  if(!file) return;
+  const cat = input.dataset.cat || '기타';
+  if(file.size > 25*1024*1024){ toast('25MB 이하 파일만 업로드할 수 있습니다.'); input.value=''; return; }
+  toast('업로드 중…');
+  const safe = file.name.replace(/[^\w.\-가-힣 ]/g, '_');
+  const path = Date.now() + '_' + safe;
+  const { error: upErr } = await sb.storage.from(DOC_BUCKET).upload(path, file);
+  if(upErr){ toast('업로드 실패: ' + upErr.message); input.value=''; return; }
+  const { error: dbErr } = await sb.from('hub_documents').insert({
+    name: file.name, category: cat, storage_path: path, uploaded_by: myName()
+  });
+  if(dbErr){ toast('기록 실패: ' + dbErr.message); input.value=''; return; }
+  input.value = '';
+  toast('업로드 완료');
+  loadDocs();
+}
+
+async function loadDocs(){
+  const body = document.getElementById('docBody');
+  let q = sb.from('hub_documents').select('*').order('created_at', { ascending: false });
+  if(docFilter !== '전체') q = q.eq('category', docFilter);
+  const { data, error } = await q;
+  if(error){ body.innerHTML = `<tr><td colspan="5" class="empty-row">불러오기 실패: ${esc(error.message)}</td></tr>`; return; }
+  if(!data || !data.length){ body.innerHTML = `<tr><td colspan="5" class="empty-row">등록된 문서가 없습니다${canEdit()?' — 「문서 업로드」로 첫 문서를 올려보세요':''}</td></tr>`; return; }
+  body.innerHTML = data.map(d => `
+    <tr>
+      <td>📄 ${esc(d.name)}</td>
+      <td>${esc(d.category)}</td>
+      <td>${esc(d.uploaded_by)}</td>
+      <td>${fmtDate(d.created_at)}</td>
+      <td>
+        <button class="tbl-btn" onclick="openDoc('${esc(d.storage_path)}')">열람</button>
+        ${CURRENT_ROLE==='admin' ? `<button class="tbl-btn danger" onclick="deleteDoc('${d.id}','${esc(d.storage_path)}')">삭제</button>` : ''}
+      </td>
+    </tr>`).join('');
+}
+
+async function openDoc(path){
+  const { data, error } = await sb.storage.from(DOC_BUCKET).createSignedUrl(path, 600); // 10분 서명 URL
+  if(error){ toast('열람 실패: ' + error.message); return; }
+  window.open(data.signedUrl, '_blank', 'noopener');
+}
+
+async function deleteDoc(id, path){
+  if(!confirm('이 문서를 삭제할까요? 되돌릴 수 없습니다.')) return;
+  await sb.storage.from(DOC_BUCKET).remove([path]);
+  const { error } = await sb.from('hub_documents').delete().eq('id', id);
+  if(error){ toast('삭제 실패: ' + error.message); return; }
+  toast('삭제 완료');
+  loadDocs();
+}
+
+// ============================================================
+// 주기업무 (매월/매년 자동으로 새 체크리스트)
+// ============================================================
+function currentPeriods(){
+  const now = new Date();
+  const mm = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0');
+  return { monthly: mm, yearly: String(now.getFullYear()) };
+}
+
+async function loadDuties(){
+  const p = currentPeriods();
+  document.getElementById('dutyMonthLabel').textContent = p.monthly.replace('-','년 ') + '월';
+  document.getElementById('dutyYearLabel').textContent = p.yearly + '년';
+  const [{ data: tasks, error: e1 }, { data: checks, error: e2 }] = await Promise.all([
+    sb.from('hub_duty_tasks').select('*').order('sort', { ascending: true }),
+    sb.from('hub_duty_checks').select('*').in('period', [p.monthly, p.yearly])
+  ]);
+  if(e1 || e2){ toast('주기업무 불러오기 실패'); return; }
+  const checkMap = {};
+  (checks || []).forEach(c => { checkMap[c.task_id + '|' + c.period] = c; });
+  const render = (cycle, boxId, period) => {
+    const list = (tasks || []).filter(t => t.cycle === cycle);
+    const box = document.getElementById(boxId);
+    if(!list.length){ box.innerHTML = '<div class="duty-item" style="color:#94a3b8;">등록된 항목 없음</div>'; return; }
+    box.innerHTML = list.map(t => {
+      const c = checkMap[t.id + '|' + period];
+      return `<div class="duty-item ${c?'done':''}">
+        <span class="cbx ${c?'checked':''}" ${canEdit()?`onclick="toggleDuty('${t.id}','${period}',${c?`'${c.id}'`:'null'})"`:''}>${c?'✓':''}</span>
+        <span class="title">${esc(t.title)}</span>
+        ${c?`<span class="who">${esc(c.checked_by)} · ${fmtDate(c.checked_at)}</span>`:''}
+        <span class="badge ${cycle==='monthly'?'m':'y'}">${esc(t.due_label || (cycle==='monthly'?'매월':'연간'))}</span>
+      </div>`;
+    }).join('');
+  };
+  render('monthly', 'dutyMonthly', p.monthly);
+  render('yearly', 'dutyYearly', p.yearly);
+  document.getElementById('dutyNote').style.display = (tasks && tasks.length) ? 'none' : 'inline-block';
+  if(CURRENT_ROLE === 'admin') renderDutyAdmin(tasks || []);
+}
+
+async function toggleDuty(taskId, period, checkId){
+  if(checkId && checkId !== 'null'){
+    if(!confirm('완료 체크를 해제할까요?')) return;
+    const { error } = await sb.from('hub_duty_checks').delete().eq('id', checkId);
+    if(error){ toast('해제 실패: ' + error.message); return; }
+  } else {
+    const { error } = await sb.from('hub_duty_checks').insert({ task_id: taskId, period, checked_by: myName() });
+    if(error){ toast('체크 실패: ' + error.message); return; }
+  }
+  loadDuties();
+}
+
+function renderDutyAdmin(tasks){
+  const box = document.getElementById('dutyAdminList');
+  if(!box) return;
+  box.innerHTML = tasks.length ? tasks.map(t =>
+    `<div style="padding:5px 0;border-bottom:1px solid #f1f4f8;display:flex;align-items:center;gap:6px;">
+      <span>${t.cycle==='monthly'?'📆':'🗓'} ${esc(t.title)} <span style="color:var(--sub)">(${esc(t.due_label||'')})</span></span>
+      <button class="tbl-btn danger" style="margin-left:auto" onclick="removeDuty('${t.id}')">삭제</button>
+    </div>`).join('') : '<div style="color:#94a3b8;">등록된 항목 없음</div>';
+}
+
+async function addDuty(){
+  const title = document.getElementById('newDutyTitle').value.trim();
+  const cycle = document.getElementById('newDutyCycle').value;
+  const label = document.getElementById('newDutyLabel').value.trim();
+  if(!title){ toast('업무명을 입력해주세요.'); return; }
+  const { error } = await sb.from('hub_duty_tasks').insert({ title, cycle, due_label: label || null, sort: Date.now() });
+  if(error){ toast('추가 실패: ' + error.message); return; }
+  document.getElementById('newDutyTitle').value = '';
+  document.getElementById('newDutyLabel').value = '';
+  toast('추가 완료');
+  loadDuties();
+}
+
+async function removeDuty(id){
+  if(!confirm('이 항목을 삭제할까요? 과거 체크 기록도 함께 삭제됩니다.')) return;
+  const { error } = await sb.from('hub_duty_tasks').delete().eq('id', id);
+  if(error){ toast('삭제 실패: ' + error.message); return; }
+  toast('삭제 완료');
+  loadDuties();
+}
+</script>
+</body>
+</html>
