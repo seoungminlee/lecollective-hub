@@ -290,7 +290,8 @@
             <option value="yearly">연간</option>
             <option value="period">유효기간(연월일)</option>
           </select>
-          <input id="newDutyLabel" placeholder="시기 표시 (예: 매월 5일 / 1월)" style="width:140px;">
+          <select id="newDutyDay" style="width:130px;"></select>
+          <input type="date" id="newDutyDate" style="display:none;">
           <span id="dutyDateBox" style="display:none;white-space:nowrap;">
             <input type="date" id="newDutyFrom"> ~ <input type="date" id="newDutyTo">
           </span>
@@ -335,7 +336,7 @@
 // ============================================================
 const SUPABASE_URL = 'https://lwcutgofpdtzcbyjszhc.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx3Y3V0Z29mcGR0emNieWpzemhjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIxMzg0ODAsImV4cCI6MjA5NzcxNDQ4MH0.g2eGcEiO8Ix0Cul9wqnNghbn5snCeqjwD9LiD_-mK6I';
-const APP_VERSION = 'hub-v1.1.1'; // 새로고침 시 로그인 화면 깜빡임 제거 (스플래시)
+const APP_VERSION = 'hub-v1.2'; // 주기업무 시기 달력/드롭다운 선택, 문서 분류명 수정 기능
 let DOC_CATEGORIES = ['기타']; // 로그인 후 hub_doc_categories 테이블에서 불러옴
 const DOC_BUCKET = 'hub-docs';
 
@@ -481,10 +482,26 @@ async function renderCatAdmin(){
   if(!box) return;
   const { data } = await sb.from('hub_doc_categories').select('*').order('sort', { ascending: true });
   box.innerHTML = (data || []).length ? data.map(c =>
-    `<div style="padding:5px 0;border-bottom:1px solid #f1f4f8;display:flex;align-items:center;">
+    `<div style="padding:5px 0;border-bottom:1px solid #f1f4f8;display:flex;align-items:center;gap:6px;">
       <span>📁 ${esc(c.name)}</span>
-      <button class="tbl-btn danger" style="margin-left:auto" onclick="removeCat('${c.id}')">삭제</button>
+      <button class="tbl-btn" style="margin-left:auto" onclick="renameCat('${c.id}','${esc(c.name)}')">수정</button>
+      <button class="tbl-btn danger" onclick="removeCat('${c.id}')">삭제</button>
     </div>`).join('') : '<div style="color:#94a3b8;">등록된 분류 없음</div>';
+}
+
+async function renameCat(id, oldName){
+  const input = prompt('새 분류명을 입력하세요:', oldName);
+  if(input === null) return;
+  const newName = input.trim();
+  if(!newName || newName === oldName) return;
+  const { error } = await sb.from('hub_doc_categories').update({ name: newName }).eq('id', id);
+  if(error){ toast('수정 실패: ' + (error.message.includes('duplicate') ? '이미 있는 분류입니다.' : error.message)); return; }
+  // 기존 문서들의 분류명도 함께 변경 (문서가 분류를 따라가도록)
+  const { error: e2 } = await sb.from('hub_documents').update({ category: newName }).eq('category', oldName);
+  if(e2){ toast('분류명은 바뀌었으나 기존 문서 반영 실패: ' + e2.message); }
+  docFilter = '전체';
+  await loadCategories(); renderDocChips(); renderCatAdmin(); loadDocs();
+  toast('분류명 수정 완료');
 }
 
 async function addCat(){
@@ -652,15 +669,17 @@ async function toggleDuty(taskId, period, checkId){
 let editingDutyId = null;
 
 function onDutyCycleChange(){
-  const isPeriod = document.getElementById('newDutyCycle').value === 'period';
-  document.getElementById('newDutyLabel').style.display = isPeriod ? 'none' : '';
-  document.getElementById('dutyDateBox').style.display = isPeriod ? 'inline' : 'none';
+  const c = document.getElementById('newDutyCycle').value;
+  document.getElementById('newDutyDay').style.display  = c === 'monthly' ? '' : 'none';   // 매월: 시행일 드롭다운
+  document.getElementById('newDutyDate').style.display = c === 'yearly' ? '' : 'none';    // 연간: 달력
+  document.getElementById('dutyDateBox').style.display = c === 'period' ? 'inline' : 'none'; // 유효기간: 시작~종료 달력
 }
 
 function resetDutyForm(){
   editingDutyId = null;
   document.getElementById('newDutyTitle').value = '';
-  document.getElementById('newDutyLabel').value = '';
+  document.getElementById('newDutyDay').value = '';
+  document.getElementById('newDutyDate').value = '';
   document.getElementById('newDutyFrom').value = '';
   document.getElementById('newDutyTo').value = '';
   document.getElementById('newDutyCycle').value = 'monthly';
@@ -673,9 +692,22 @@ function editDuty(id, title, cycle, label, from, to){
   editingDutyId = id;
   document.getElementById('newDutyTitle').value = title;
   document.getElementById('newDutyCycle').value = cycle;
-  document.getElementById('newDutyLabel').value = label || '';
+  document.getElementById('newDutyDay').value = '';
+  document.getElementById('newDutyDate').value = '';
   document.getElementById('newDutyFrom').value = from || '';
   document.getElementById('newDutyTo').value = to || '';
+  // 기존 시기 표시를 컨트롤에 복원 (예: '매월 5일' → 5 / '12월 19일' → 달력)
+  if(cycle === 'monthly'){
+    if(/말일/.test(label || '')) document.getElementById('newDutyDay').value = '말일';
+    else { const m = (label || '').match(/(\d{1,2})일/); if(m) document.getElementById('newDutyDay').value = m[1]; }
+  }
+  if(cycle === 'yearly'){
+    const m = (label || '').match(/(\d{1,2})월\s*(\d{1,2})일/);
+    if(m){
+      const y = new Date().getFullYear();
+      document.getElementById('newDutyDate').value = y + '-' + String(m[1]).padStart(2,'0') + '-' + String(m[2]).padStart(2,'0');
+    }
+  }
   onDutyCycleChange();
   document.getElementById('dutySaveBtn').textContent = '수정 저장';
   document.getElementById('dutyCancelBtn').style.display = '';
@@ -688,8 +720,9 @@ function renderDutyAdmin(tasks){
   box.innerHTML = tasks.length ? tasks.map(t => {
     const icon = t.cycle==='monthly' ? '📆' : t.cycle==='yearly' ? '🗓' : '📋';
     const info = t.cycle==='period' ? `${esc(t.valid_from||'?')} ~ ${esc(t.valid_to||'?')}` : esc(t.due_label||'');
+    const infoHtml = info ? ` <span style="color:var(--sub)">(${info})</span>` : '';
     return `<div style="padding:5px 0;border-bottom:1px solid #f1f4f8;display:flex;align-items:center;gap:6px;">
-      <span>${icon} ${esc(t.title)} <span style="color:var(--sub)">(${info})</span></span>
+      <span>${icon} ${esc(t.title)}${infoHtml}</span>
       <button class="tbl-btn" style="margin-left:auto" onclick="editDuty('${t.id}','${esc(t.title)}','${t.cycle}','${esc(t.due_label||'')}','${t.valid_from||''}','${t.valid_to||''}')">수정</button>
       <button class="tbl-btn danger" onclick="removeDuty('${t.id}')">삭제</button>
     </div>`;
@@ -699,7 +732,6 @@ function renderDutyAdmin(tasks){
 async function addDuty(){
   const title = document.getElementById('newDutyTitle').value.trim();
   const cycle = document.getElementById('newDutyCycle').value;
-  const label = document.getElementById('newDutyLabel').value.trim();
   const from = document.getElementById('newDutyFrom').value;
   const to = document.getElementById('newDutyTo').value;
   if(!title){ toast('업무명을 입력해주세요.'); return; }
@@ -707,9 +739,22 @@ async function addDuty(){
     if(!from || !to){ toast('시작일과 종료일을 달력에서 모두 선택해주세요.'); return; }
     if(from > to){ toast('종료일이 시작일보다 빠릅니다.'); return; }
   }
+  // 시기 표시는 컨트롤 값으로 생성 (직접 입력 없음)
+  let due_label = null;
+  if(cycle === 'monthly'){
+    const d = document.getElementById('newDutyDay').value;
+    if(!d){ toast('매월 시행일을 선택해주세요.'); return; }
+    due_label = d === '말일' ? '매월 말일' : '매월 ' + d + '일';
+  }
+  if(cycle === 'yearly'){
+    const v = document.getElementById('newDutyDate').value;
+    if(!v){ toast('시행일을 달력에서 선택해주세요.'); return; }
+    const dt = v.split('-');
+    due_label = parseInt(dt[1]) + '월 ' + parseInt(dt[2]) + '일';
+  }
   const row = {
     title, cycle,
-    due_label: cycle === 'period' ? null : (label || null),
+    due_label,
     valid_from: cycle === 'period' ? from : null,
     valid_to: cycle === 'period' ? to : null
   };
@@ -733,6 +778,17 @@ async function removeDuty(id){
   toast('삭제 완료');
   loadDuties();
 }
+
+// ── 초기화: 매월 시행일 드롭다운 채우기 (1~31일 + 말일) ──
+(function(){
+  const sel = document.getElementById('newDutyDay');
+  if(sel){
+    sel.innerHTML = '<option value="">시행일 선택</option>'
+      + Array.from({length:31}, (_,i)=>`<option value="${i+1}">${i+1}일</option>`).join('')
+      + '<option value="말일">말일</option>';
+  }
+  onDutyCycleChange();
+})();
 </script>
 </body>
 </html>
