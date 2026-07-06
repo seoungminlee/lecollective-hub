@@ -44,6 +44,13 @@
   .btn-ghost{background:transparent;border:1px solid #47597e;color:#c9d6ee;padding:6px 12px;border-radius:8px;font-size:12px;cursor:pointer;}
   .btn-ghost:hover{background:var(--navy-2);}
 
+  /* ── 통합 검색 ── */
+  .search-wrap{position:relative;}
+  #globalSearch{background:var(--navy-2);border:1px solid #47597e;color:#fff;padding:7px 12px;border-radius:8px;font-size:12.5px;width:180px;}
+  #globalSearch::placeholder{color:#8ea0c2;}
+  #globalSearch:focus{outline:none;border-color:var(--accent);width:220px;}
+  #searchResults{display:none;position:absolute;top:38px;right:0;background:#fff;border:1px solid var(--line);border-radius:10px;width:280px;max-height:320px;overflow-y:auto;box-shadow:0 12px 30px rgba(0,0,0,.15);z-index:60;}
+
   nav{background:#fff;border-bottom:1px solid var(--line);padding:0 24px;display:flex;gap:4px;position:sticky;top:60px;z-index:40;overflow-x:auto;}
   nav button{border:none;background:none;padding:14px 16px;font-size:14px;color:var(--sub);cursor:pointer;border-bottom:2.5px solid transparent;white-space:nowrap;font-weight:500;}
   nav button.on{color:var(--accent);border-bottom-color:var(--accent);font-weight:700;}
@@ -93,6 +100,7 @@
   .duty-item{display:flex;align-items:center;gap:10px;padding:10px 4px;border-bottom:1px solid #f1f4f8;font-size:13px;}
   .duty-item:last-child{border-bottom:none;}
   .duty-item.done .title{text-decoration:line-through;color:#94a3b8;}
+  .duty-item.overdue{background:#fef2f2;border-radius:8px;}
   .duty-item .who{font-size:11px;color:var(--sub);}
   .cbx{width:18px;height:18px;border:1.5px solid #cbd5e1;border-radius:5px;flex-shrink:0;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px;background:#fff;}
   .cbx.checked{background:var(--green);border-color:var(--green);color:#fff;}
@@ -176,6 +184,10 @@
     <div><h1>르컬렉티브 시흥 웨이브파크 <small>지점 통합 대시보드</small></h1></div>
   </div>
   <div class="user-area">
+    <div class="search-wrap">
+      <input type="text" id="globalSearch" placeholder="🔍 문서·주기업무 검색" oninput="onGlobalSearch(this.value)" onblur="setTimeout(()=>{document.getElementById('searchResults').style.display='none'},200)">
+      <div id="searchResults"></div>
+    </div>
     <span class="user-chip" id="userChip">👤 —</span>
     <button class="btn-ghost" onclick="doLogout()">로그아웃</button>
   </div>
@@ -192,6 +204,7 @@
 
   <!-- 탭 1: 홈 -->
   <div class="tabpane on" id="home">
+    <div id="homeAlertBox" style="display:none;"></div>
     <div class="sec-title"><span class="dot" style="background:var(--amber)"></span> 시설관리 <span class="tag">담당 직군: M3</span></div>
     <div class="dash-grid">
       <div class="dash-card">
@@ -251,8 +264,9 @@
         </div>
       </div>
     </div>
+    <input type="file" id="versionFile" style="display:none" onchange="onVersionFileChosen(this)">
     <table>
-      <thead><tr><th style="width:42%">문서명</th><th>분류</th><th>등록자</th><th>등록일</th><th style="width:120px"></th></tr></thead>
+      <thead><tr><th style="width:38%">문서명</th><th>분류</th><th>등록자</th><th>등록일</th><th style="width:170px"></th></tr></thead>
       <tbody id="docBody"><tr><td colspan="5" class="empty-row">불러오는 중…</td></tr></tbody>
     </table>
     <p style="font-size:11.5px;color:var(--sub);margin-top:10px;">🔒 문서는 비공개 저장소에 보관되며, 열람 시 10분간만 유효한 보안 링크로 열립니다.</p>
@@ -322,6 +336,14 @@
         <div id="dbUsageBox">불러오는 중…</div>
         <p style="margin-top:8px;">백업 파일은 GitHub에 저장되므로 이 용량과 무관합니다. 여기 표시되는 건 실제 운영 데이터베이스 크기입니다.</p>
       </div>
+      <div class="admin-card" style="grid-column:1/-1;">
+        <h3>📜 허브 감사 로그 <span style="font-size:11px;color:var(--sub);font-weight:400;">(문서·분류·주기업무 변경 이력 — 관리자 전용)</span></h3>
+        <div id="auditLogBox" style="max-height:260px;overflow-y:auto;">불러오는 중…</div>
+      </div>
+      <div class="admin-card" style="grid-column:1/-1;">
+        <h3>🕓 업데이트 내역</h3>
+        <div id="updateHistoryBox"></div>
+      </div>
     </div>
   </div>
 
@@ -341,12 +363,49 @@
 // ============================================================
 const SUPABASE_URL = 'https://lwcutgofpdtzcbyjszhc.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx3Y3V0Z29mcGR0emNieWpzemhjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIxMzg0ODAsImV4cCI6MjA5NzcxNDQ4MH0.g2eGcEiO8Ix0Cul9wqnNghbn5snCeqjwD9LiD_-mK6I';
-const APP_VERSION = 'hub-v1.4'; // 매월/연간 시기 표시 "N일경"으로 변경 + 기간별 메모 기능 추가
+const APP_VERSION = 'hub-v1.5'; // 주기업무 기한 경고, 감사 로그, 문서 버전 관리, 통합 검색
 let DOC_CATEGORIES = ['기타']; // 로그인 후 hub_doc_categories 테이블에서 불러옴
 const DOC_BUCKET = 'hub-docs';
 
 let sb = null, CURRENT_USER = null, CURRENT_ROLE = 'viewer';
 let docFilter = '전체';
+let ALERTS_DUTY = [], ALERTS_DB = [];
+
+// ── 업데이트 내역 (실제 배포 이력) ──
+const HUB_UPDATE_HISTORY = [
+  { version:'hub-v1.5', date:'2026-07-06', title:'주기업무 기한 경고 · 감사 로그 · 문서 버전 관리 · 통합 검색', notes:[
+    '마감 지난 미체크 항목 자동 경고 (홈 화면 배너 + 빨간 배지)',
+    '허브 자체 감사 로그 추가 — 문서·분류·주기업무 변경 이력 기록 (admin 전용 열람)',
+    '문서 새 버전 업로드 및 이전 버전 열람 기능',
+    '헤더 통합 검색 — 문서·주기업무 이름으로 즉시 검색'
+  ]},
+  { version:'hub-v1.4', date:'2026-07-05', title:'시기 표시 "N일경" 처리 + 기간별 메모', notes:[
+    '매월/연간 시기 표시에 "경"을 붙여 대략적 시기임을 명시 (주말·거래처 사정으로 실제와 다를 수 있음)',
+    '실제 청구서 등으로 확인한 정확한 날짜를 매 기간 메모로 기록 (시스템이 임의로 계산하지 않음)'
+  ]},
+  { version:'hub-v1.3', date:'2026-07-05', title:'DB 사용량(500MB 한도) 표시 카드', notes:[
+    '관리 탭에 실제 DB 사용량·비율·경고 표시 (admin 전용, security definer RPC)'
+  ]},
+  { version:'hub-v1.2', date:'2026-07-03', title:'주기업무 시기 선택 달력/드롭다운화, 문서 분류명 수정', notes:[
+    '매월 시행일 드롭다운, 연간 시행일 달력 선택으로 변경 (직접 텍스트 입력 제거)',
+    '문서 분류명 수정 시 기존 문서 분류도 함께 반영'
+  ]},
+  { version:'hub-v1.1.1', date:'2026-07-03', title:'새로고침 시 로그인 화면 깜빡임 제거', notes:[
+    '세션 확인 중 로딩 화면(스플래시)으로 가려 깜빡임 방지'
+  ]},
+  { version:'hub-v1.1', date:'2026-07-03', title:'문서 분류 드롭다운·유효기간 관리 추가', notes:[
+    '문서 업로드 시 분류 드롭다운 선택 + 관리자 분류 관리 기능',
+    '주기업무에 「유효기간(연월일)」 유형 추가 — 보험·교육 등 만료 D-day 경고',
+    '담당 직군 표기를 M3/M4로 통일, 세탁비·청소비·통신비 문구 삭제'
+  ]},
+  { version:'hub-v1.0.1', date:'2026-07-03', title:'관리 탭 표시 버그·한글 파일 업로드 실패 수정', notes:[
+    '관리자 로그인 시 관리 탭이 표시되지 않던 버그 수정',
+    '한글 파일명 업로드 실패 문제 수정 (저장 경로 영문화, 원본 파일명은 별도 표시)'
+  ]},
+  { version:'hub-v1.0', date:'2026-07-03', title:'모 대시보드 최초 배포', notes:[
+    '로그인 통합(하자관리 시스템과 세션 공유), 홈 포털, 문서보관소, 주기업무(월간/연간) 기본 기능'
+  ]},
+];
 
 document.getElementById('verLabel').textContent = APP_VERSION + ' (' + new Date().getFullYear() + ')';
 
@@ -419,7 +478,57 @@ function enterApp(){
     if(CURRENT_ROLE === 'admin') renderCatAdmin();
   });
   loadDuties();
-  if(CURRENT_ROLE === 'admin') loadDbUsage();
+  if(CURRENT_ROLE === 'admin'){
+    loadDbUsage();
+    loadAuditLog();
+    renderUpdateHistory();
+  }
+}
+
+// ── 허브 자체 감사 로그 (부가 기능 — 실패해도 주 기능에 영향 없음) ──
+async function logAudit(action, detail){
+  try{ await sb.from('hub_audit_logs').insert({ actor: myName(), action, detail: detail || null }); }
+  catch(e){ /* 감사 로그 기록 실패는 조용히 무시 */ }
+}
+
+async function loadAuditLog(){
+  const box = document.getElementById('auditLogBox');
+  if(!box) return;
+  const { data, error } = await sb.from('hub_audit_logs').select('*').order('created_at', { ascending: false }).limit(50);
+  if(error){ box.innerHTML = `<span style="color:var(--sub);font-size:12.5px;">불러오기 실패 (v34 SQL 실행 여부 확인 필요): ${esc(error.message)}</span>`; return; }
+  if(!data || !data.length){ box.innerHTML = '<div style="color:#94a3b8;font-size:12.5px;">기록 없음</div>'; return; }
+  box.innerHTML = data.map(l => `
+    <div style="padding:6px 0;border-bottom:1px solid #f1f4f8;font-size:12px;display:flex;gap:8px;">
+      <span style="color:var(--sub);white-space:nowrap;">${fmtDate(l.created_at)}</span>
+      <span style="font-weight:600;">${esc(l.actor)}</span>
+      <span>${esc(l.action)}</span>
+      <span style="color:var(--sub);">${esc(l.detail || '')}</span>
+    </div>`).join('');
+}
+
+function renderUpdateHistory(){
+  const box = document.getElementById('updateHistoryBox');
+  if(!box) return;
+  box.innerHTML = HUB_UPDATE_HISTORY.map(h => `
+    <div style="padding:10px 0;border-bottom:1px solid #f1f4f8;">
+      <div style="font-size:12.5px;font-weight:700;">${esc(h.version)} <span style="color:var(--sub);font-weight:400;">· ${esc(h.date)} · ${esc(h.title)}</span></div>
+      <ul style="margin:4px 0 0 18px;font-size:11.5px;color:var(--sub);">
+        ${h.notes.map(n => `<li>${esc(n)}</li>`).join('')}
+      </ul>
+    </div>`).join('');
+}
+
+// ── 홈 화면 상단 경고 배너 (SLA·유효기간·DB용량 — 이메일 없이 로그인 시 바로 표시) ──
+function renderHomeAlerts(){
+  const box = document.getElementById('homeAlertBox');
+  if(!box) return;
+  const all = [...ALERTS_DUTY, ...ALERTS_DB];
+  if(!all.length){ box.style.display = 'none'; box.innerHTML = ''; return; }
+  box.style.display = 'block';
+  box.innerHTML = `<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:12px;padding:14px 16px;margin-bottom:20px;">
+    <div style="font-weight:700;color:var(--red);font-size:13.5px;margin-bottom:6px;">⚠ 확인이 필요한 항목 ${all.length}건</div>
+    ${all.map(a => `<div style="font-size:12.5px;color:#7f1d1d;padding:2px 0;">${a}</div>`).join('')}
+  </div>`;
 }
 
 async function loadDbUsage(){
@@ -442,6 +551,8 @@ async function loadDbUsage(){
     </div>
     ${data.percent >= 70 ? `<p style="color:${color};font-size:12px;margin-top:8px;font-weight:600;">⚠ 한도에 가까워지고 있습니다 — 정식 플랫폼(유료) 전환 검토를 권장합니다.</p>` : ''}
   `;
+  ALERTS_DB = data.percent >= 85 ? [`💾 DB 사용량 ${data.percent}% — 정식 전환 검토가 필요합니다.`] : [];
+  renderHomeAlerts();
 }
 
 async function doChangePw(){
@@ -529,6 +640,7 @@ async function renameCat(id, oldName){
   if(e2){ toast('분류명은 바뀌었으나 기존 문서 반영 실패: ' + e2.message); }
   docFilter = '전체';
   await loadCategories(); renderDocChips(); renderCatAdmin(); loadDocs();
+  logAudit('문서 분류명 수정', oldName + ' → ' + newName);
   toast('분류명 수정 완료');
 }
 
@@ -539,6 +651,7 @@ async function addCat(){
   if(error){ toast('추가 실패: ' + (error.message.includes('duplicate') ? '이미 있는 분류입니다.' : error.message)); return; }
   document.getElementById('newCatName').value = '';
   await loadCategories(); renderDocChips(); renderCatAdmin();
+  logAudit('문서 분류 추가', name);
   toast('분류 추가 완료');
 }
 
@@ -548,6 +661,7 @@ async function removeCat(id){
   if(error){ toast('삭제 실패: ' + error.message); return; }
   docFilter = '전체';
   await loadCategories(); renderDocChips(); renderCatAdmin(); loadDocs();
+  logAudit('문서 분류 삭제', id);
   toast('분류 삭제 완료');
 }
 
@@ -578,6 +692,7 @@ async function doUpload(){
   });
   if(dbErr){ toast('기록 실패: ' + dbErr.message); return; }
   closeUploadModal();
+  logAudit('문서 업로드', file.name + ' (' + cat + ')');
   toast('업로드 완료');
   loadDocs();
 }
@@ -591,15 +706,103 @@ async function loadDocs(){
   if(!data || !data.length){ body.innerHTML = `<tr><td colspan="5" class="empty-row">등록된 문서가 없습니다${canEdit()?' — 「문서 업로드」로 첫 문서를 올려보세요':''}</td></tr>`; return; }
   body.innerHTML = data.map(d => `
     <tr>
-      <td>📄 ${esc(d.name)}</td>
+      <td>📄 ${esc(d.name)} ${d.version > 1 ? `<span style="font-size:10.5px;color:var(--sub);background:#eef1f6;padding:1px 6px;border-radius:6px;">v${d.version}</span>` : ''}</td>
       <td>${esc(d.category)}</td>
       <td>${esc(d.uploaded_by)}</td>
       <td>${fmtDate(d.created_at)}</td>
-      <td>
+      <td style="white-space:nowrap;">
         <button class="tbl-btn" onclick="openDoc('${esc(d.storage_path)}')">열람</button>
-        ${CURRENT_ROLE==='admin' ? `<button class="tbl-btn danger" onclick="deleteDoc('${d.id}','${esc(d.storage_path)}')">삭제</button>` : ''}
+        ${canEdit() ? `<button class="tbl-btn" onclick="pickNewVersion('${d.id}')">새 버전</button>` : ''}
+        ${CURRENT_ROLE==='admin' && d.version > 1 ? `<button class="tbl-btn" onclick="viewDocVersions('${d.id}','${esc(d.name).replace(/'/g,"\\'")}')">이력</button>` : ''}
+        ${CURRENT_ROLE==='admin' ? `<button class="tbl-btn danger" onclick="deleteDoc('${d.id}','${esc(d.storage_path)}','${esc(d.name).replace(/'/g,"\\'")}')">삭제</button>` : ''}
       </td>
     </tr>`).join('');
+}
+
+// ── 문서 새 버전 업로드 / 이전 버전 열람 ──
+function pickNewVersion(docId){
+  const input = document.getElementById('versionFile');
+  input.dataset.docId = docId;
+  input.value = '';
+  input.click();
+}
+
+async function onVersionFileChosen(input){
+  const file = input.files[0];
+  if(!file) return;
+  const docId = input.dataset.docId;
+  if(file.size > 25*1024*1024){ toast('25MB 이하 파일만 업로드할 수 있습니다.'); input.value=''; return; }
+  const { data: doc, error: e0 } = await sb.from('hub_documents').select('*').eq('id', docId).single();
+  if(e0 || !doc){ toast('문서 정보를 불러오지 못했습니다.'); input.value=''; return; }
+  toast('새 버전 업로드 중…');
+  const extMatch = file.name.match(/\.([A-Za-z0-9]{1,8})$/);
+  const ext = extMatch ? extMatch[1].toLowerCase() : 'bin';
+  const newPath = Date.now() + '_' + Math.random().toString(36).slice(2, 8) + '.' + ext;
+  const { error: upErr } = await sb.storage.from(DOC_BUCKET).upload(newPath, file);
+  if(upErr){ toast('업로드 실패: ' + upErr.message); input.value=''; return; }
+  const oldVersion = doc.version || 1;
+  const { error: vErr } = await sb.from('hub_document_versions').insert({
+    document_id: docId, storage_path: doc.storage_path, version: oldVersion, replaced_by: myName()
+  });
+  if(vErr){ toast('이전 버전 보관 실패: ' + vErr.message); input.value=''; return; }
+  const { error: updErr } = await sb.from('hub_documents').update({
+    storage_path: newPath, version: oldVersion + 1, updated_at: new Date().toISOString(), uploaded_by: myName()
+  }).eq('id', docId);
+  if(updErr){ toast('갱신 실패: ' + updErr.message); input.value=''; return; }
+  input.value = '';
+  logAudit('문서 새 버전 업로드', doc.name + ' → v' + (oldVersion + 1));
+  toast('새 버전 업로드 완료');
+  loadDocs();
+}
+
+async function viewDocVersions(docId, name){
+  const { data, error } = await sb.from('hub_document_versions').select('*').eq('document_id', docId).order('version', { ascending: false });
+  if(error){ toast('이력 조회 실패: ' + error.message); return; }
+  if(!data || !data.length){ alert(name + ' — 이전 버전 없음'); return; }
+  let msg = name + ' 이전 버전 목록:\n';
+  data.forEach(v => { msg += `v${v.version} — ${v.replaced_by} · ${fmtDate(v.replaced_at)}\n`; });
+  const idx = prompt(msg + '\n열람할 버전 번호를 입력하세요 (취소하면 닫힘):');
+  if(!idx) return;
+  const target = data.find(v => String(v.version) === idx.trim());
+  if(!target){ toast('해당 버전을 찾을 수 없습니다.'); return; }
+  const { data: urlData, error: e2 } = await sb.storage.from(DOC_BUCKET).createSignedUrl(target.storage_path, 600);
+  if(e2){ toast('열람 실패: ' + e2.message); return; }
+  window.open(urlData.signedUrl, '_blank', 'noopener');
+}
+
+// ── 헤더 통합 검색 ──
+let searchDebounce = null;
+function onGlobalSearch(val){
+  clearTimeout(searchDebounce);
+  const q = val.trim();
+  const panel = document.getElementById('searchResults');
+  if(q.length < 2){ panel.style.display = 'none'; panel.innerHTML = ''; return; }
+  searchDebounce = setTimeout(() => runGlobalSearch(q), 300);
+}
+
+async function runGlobalSearch(q){
+  const panel = document.getElementById('searchResults');
+  const [{ data: docs }, { data: duties }] = await Promise.all([
+    sb.from('hub_documents').select('id,name,category').ilike('name', '%' + q + '%').limit(6),
+    sb.from('hub_duty_tasks').select('id,title,cycle').ilike('title', '%' + q + '%').limit(6)
+  ]);
+  const items = [
+    ...(docs || []).map(d => ({ type: '문서', label: d.name, sub: d.category, tab: 'docs' })),
+    ...(duties || []).map(t => ({ type: '주기업무', label: t.title, sub: t.cycle==='monthly'?'매월':t.cycle==='yearly'?'연간':'유효기간', tab: 'duty' }))
+  ];
+  if(!items.length){ panel.innerHTML = '<div style="padding:12px;color:#94a3b8;font-size:12.5px;">검색 결과 없음</div>'; panel.style.display = 'block'; return; }
+  panel.innerHTML = items.map(it => `
+    <div style="padding:9px 12px;border-bottom:1px solid #f1f4f8;cursor:pointer;font-size:12.5px;" onmousedown="jumpToTab('${it.tab}')">
+      <span style="color:var(--sub);">[${it.type}]</span> ${esc(it.label)} <span style="color:#cbd5e1;">${esc(it.sub || '')}</span>
+    </div>`).join('');
+  panel.style.display = 'block';
+}
+
+function jumpToTab(tabId){
+  document.getElementById('searchResults').style.display = 'none';
+  document.getElementById('globalSearch').value = '';
+  const btn = document.querySelector(`nav button[data-tab="${tabId}"]`);
+  if(btn) switchTab(tabId, btn);
 }
 
 async function openDoc(path){
@@ -608,11 +811,12 @@ async function openDoc(path){
   window.open(data.signedUrl, '_blank', 'noopener');
 }
 
-async function deleteDoc(id, path){
+async function deleteDoc(id, path, name){
   if(!confirm('이 문서를 삭제할까요? 되돌릴 수 없습니다.')) return;
   await sb.storage.from(DOC_BUCKET).remove([path]);
   const { error } = await sb.from('hub_documents').delete().eq('id', id);
   if(error){ toast('삭제 실패: ' + error.message); return; }
+  logAudit('문서 삭제', name || id);
   toast('삭제 완료');
   loadDocs();
 }
@@ -640,6 +844,8 @@ async function loadDuties(){
   (checks || []).forEach(c => { checkMap[c.task_id + '|' + c.period] = c; });
   const noteMap = {};
   (notes || []).forEach(n => { noteMap[n.task_id + '|' + n.period] = n; });
+  ALERTS_DUTY = []; // 매번 새로 계산
+  const today = new Date(); today.setHours(0,0,0,0);
   const render = (cycle, boxId, period) => {
     const list = (tasks || []).filter(t => t.cycle === cycle);
     const box = document.getElementById(boxId);
@@ -652,20 +858,47 @@ async function loadDuties(){
              ${n ? '📝 ' + esc(n.note) + ` <span style="color:#cbd5e1">(${esc(n.updated_by)})</span>` : '📝 이번 ' + (cycle==='monthly'?'달':'년도') + ' 정확한 날짜 메모 추가'}
            </div>`
         : (n ? `<div style="font-size:11.5px;color:#1f2937;padding:2px 0 8px 28px;">📝 ${esc(n.note)}</div>` : '');
-      return `<div class="duty-item ${c?'done':''}" style="flex-wrap:wrap;">
+      // 마감 지난 미체크 항목 표시 — due_day/due_mmdd가 저장된 항목만 계산 (레거시 항목은 「수정」 후 재저장하면 계산 대상이 됨)
+      let overdue = false;
+      if(!c){
+        const dueDate = computeDueDate(cycle, period, t);
+        if(dueDate && today > dueDate) overdue = true;
+      }
+      if(overdue){ ALERTS_DUTY.push(`📅 <b>${esc(t.title)}</b> — ${cycle==='monthly'?'이번 달':'올해'} 마감이 지났는데 아직 미완료입니다.`); }
+      return `<div class="duty-item ${c?'done':''} ${overdue?'overdue':''}" style="flex-wrap:wrap;">
         <span class="cbx ${c?'checked':''}" ${canEdit()?`onclick="toggleDuty('${t.id}','${period}',${c?`'${c.id}'`:'null'})"`:''}>${c?'✓':''}</span>
         <span class="title">${esc(t.title)}</span>
         ${c?`<span class="who">${esc(c.checked_by)} · ${fmtDate(c.checked_at)}</span>`:''}
         <span class="badge ${cycle==='monthly'?'m':'y'}">${esc(t.due_label || (cycle==='monthly'?'매월':'연간'))}</span>
+        ${overdue ? '<span class="badge r">⚠ 기한 지남</span>' : ''}
         ${noteHtml}
       </div>`;
     }).join('');
   };
   render('monthly', 'dutyMonthly', p.monthly);
   render('yearly', 'dutyYearly', p.yearly);
-  renderPeriodItems(tasks || []);
+  renderPeriodItems(tasks || []); // 이 안에서 D-7 이하 항목을 ALERTS_DUTY에 추가함
+  renderHomeAlerts();
   document.getElementById('dutyNote').style.display = (tasks && tasks.length) ? 'none' : 'inline-block';
   if(CURRENT_ROLE === 'admin') renderDutyAdmin(tasks || []);
+}
+
+// 매월/매년 항목의 "이번 기간" 실제 마감일 계산 (due_day: 매월용 1~31 또는 0=말일 / due_mmdd: 매년용 'MM-DD')
+// 레거시 항목(due_day·due_mmdd 미저장)은 계산 불가 → null 반환하여 경고 대상에서 제외
+function computeDueDate(cycle, period, t){
+  if(cycle === 'monthly'){
+    if(t.due_day === null || t.due_day === undefined) return null;
+    const [y, m] = period.split('-').map(Number);
+    const daysInMonth = new Date(y, m, 0).getDate();
+    const day = t.due_day === 0 ? daysInMonth : Math.min(t.due_day, daysInMonth);
+    return new Date(y, m - 1, day);
+  }
+  if(cycle === 'yearly'){
+    if(!t.due_mmdd) return null;
+    const [mm, dd] = t.due_mmdd.split('-').map(Number);
+    return new Date(Number(period), mm - 1, dd);
+  }
+  return null;
 }
 
 // ── 유효기간 항목 (보험·위생교육 등) — 만료 30일 전부터 경고 ──
@@ -683,6 +916,11 @@ function renderPeriodItems(tasks){
       badge = days < 0 ? '<span class="badge r">만료됨</span>'
             : days <= 30 ? `<span class="badge a">D-${days}</span>`
             : '<span class="badge g">유효</span>';
+      if(days <= 7){
+        ALERTS_DUTY.push(days < 0
+          ? `📋 <b>${esc(t.title)}</b> — 이미 만료되었습니다 (${esc(t.valid_to)}).`
+          : `📋 <b>${esc(t.title)}</b> — 만료까지 D-${days} (${esc(t.valid_to)}).`);
+      }
     }
     return `<div class="duty-item">
       <span class="title">${esc(t.title)}</span>
@@ -700,6 +938,7 @@ async function editDutyNote(taskId, period, currentNote){
   if(!note){
     const { error } = await sb.from('hub_duty_notes').delete().eq('task_id', taskId).eq('period', period);
     if(error){ toast('삭제 실패: ' + error.message); return; }
+    logAudit('주기업무 메모 삭제', period);
     toast('메모 삭제 완료');
   } else {
     const { error } = await sb.from('hub_duty_notes').upsert(
@@ -707,6 +946,7 @@ async function editDutyNote(taskId, period, currentNote){
       { onConflict: 'task_id,period' }
     );
     if(error){ toast('저장 실패: ' + error.message); return; }
+    logAudit('주기업무 메모 저장', period + ' — ' + note);
     toast('메모 저장 완료');
   }
   loadDuties();
@@ -717,9 +957,11 @@ async function toggleDuty(taskId, period, checkId){
     if(!confirm('완료 체크를 해제할까요?')) return;
     const { error } = await sb.from('hub_duty_checks').delete().eq('id', checkId);
     if(error){ toast('해제 실패: ' + error.message); return; }
+    logAudit('주기업무 체크 해제', period);
   } else {
     const { error } = await sb.from('hub_duty_checks').insert({ task_id: taskId, period, checked_by: myName() });
     if(error){ toast('체크 실패: ' + error.message); return; }
+    logAudit('주기업무 완료 체크', period);
   }
   loadDuties();
 }
@@ -798,22 +1040,24 @@ async function addDuty(){
     if(from > to){ toast('종료일이 시작일보다 빠릅니다.'); return; }
   }
   // 시기 표시는 컨트롤 값으로 생성 (직접 입력 없음)
-  let due_label = null;
+  let due_label = null, due_day = null, due_mmdd = null;
   if(cycle === 'monthly'){
     const d = document.getElementById('newDutyDay').value;
     if(!d){ toast('매월 시행일을 선택해주세요.'); return; }
     // 실제 마감일은 주말·공휴일·거래처 사정으로 달라질 수 있어 "경"(대략)으로 표기 — 정확한 날짜는 매달 메모로 기록
     due_label = d === '말일' ? '매월 말일경' : '매월 ' + d + '일경';
+    due_day = d === '말일' ? 0 : parseInt(d); // 0 = 말일 (기한 지남 판정용)
   }
   if(cycle === 'yearly'){
     const v = document.getElementById('newDutyDate').value;
     if(!v){ toast('시행일을 달력에서 선택해주세요.'); return; }
     const dt = v.split('-');
     due_label = parseInt(dt[1]) + '월 ' + parseInt(dt[2]) + '일경';
+    due_mmdd = dt[1] + '-' + dt[2]; // 'MM-DD' (기한 지남 판정용)
   }
   const row = {
     title, cycle,
-    due_label,
+    due_label, due_day, due_mmdd,
     valid_from: cycle === 'period' ? from : null,
     valid_to: cycle === 'period' ? to : null
   };
@@ -825,6 +1069,7 @@ async function addDuty(){
     ({ error } = await sb.from('hub_duty_tasks').insert(row));
   }
   if(error){ toast('저장 실패: ' + error.message); return; }
+  logAudit(editingDutyId ? '주기업무 항목 수정' : '주기업무 항목 추가', title);
   toast(editingDutyId ? '수정 완료' : '추가 완료');
   resetDutyForm();
   loadDuties();
@@ -834,6 +1079,7 @@ async function removeDuty(id){
   if(!confirm('이 항목을 삭제할까요? 과거 체크 기록도 함께 삭제됩니다.')) return;
   const { error } = await sb.from('hub_duty_tasks').delete().eq('id', id);
   if(error){ toast('삭제 실패: ' + error.message); return; }
+  logAudit('주기업무 항목 삭제', id);
   toast('삭제 완료');
   loadDuties();
 }
