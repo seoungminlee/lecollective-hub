@@ -341,7 +341,7 @@
 // ============================================================
 const SUPABASE_URL = 'https://lwcutgofpdtzcbyjszhc.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx3Y3V0Z29mcGR0emNieWpzemhjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIxMzg0ODAsImV4cCI6MjA5NzcxNDQ4MH0.g2eGcEiO8Ix0Cul9wqnNghbn5snCeqjwD9LiD_-mK6I';
-const APP_VERSION = 'hub-v1.3'; // 관리 탭 DB 사용량(500MB 한도) 표시 카드 추가
+const APP_VERSION = 'hub-v1.4'; // 매월/연간 시기 표시 "N일경"으로 변경 + 기간별 메모 기능 추가
 let DOC_CATEGORIES = ['기타']; // 로그인 후 hub_doc_categories 테이블에서 불러옴
 const DOC_BUCKET = 'hub-docs';
 
@@ -630,24 +630,34 @@ async function loadDuties(){
   const p = currentPeriods();
   document.getElementById('dutyMonthLabel').textContent = p.monthly.replace('-','년 ') + '월';
   document.getElementById('dutyYearLabel').textContent = p.yearly + '년';
-  const [{ data: tasks, error: e1 }, { data: checks, error: e2 }] = await Promise.all([
+  const [{ data: tasks, error: e1 }, { data: checks, error: e2 }, { data: notes, error: e3 }] = await Promise.all([
     sb.from('hub_duty_tasks').select('*').order('sort', { ascending: true }),
-    sb.from('hub_duty_checks').select('*').in('period', [p.monthly, p.yearly])
+    sb.from('hub_duty_checks').select('*').in('period', [p.monthly, p.yearly]),
+    sb.from('hub_duty_notes').select('*').in('period', [p.monthly, p.yearly])
   ]);
-  if(e1 || e2){ toast('주기업무 불러오기 실패'); return; }
+  if(e1 || e2 || e3){ toast('주기업무 불러오기 실패'); return; }
   const checkMap = {};
   (checks || []).forEach(c => { checkMap[c.task_id + '|' + c.period] = c; });
+  const noteMap = {};
+  (notes || []).forEach(n => { noteMap[n.task_id + '|' + n.period] = n; });
   const render = (cycle, boxId, period) => {
     const list = (tasks || []).filter(t => t.cycle === cycle);
     const box = document.getElementById(boxId);
     if(!list.length){ box.innerHTML = '<div class="duty-item" style="color:#94a3b8;">등록된 항목 없음</div>'; return; }
     box.innerHTML = list.map(t => {
       const c = checkMap[t.id + '|' + period];
-      return `<div class="duty-item ${c?'done':''}">
+      const n = noteMap[t.id + '|' + period];
+      const noteHtml = canEdit()
+        ? `<div style="font-size:11.5px;color:${n?'#1f2937':'#94a3b8'};padding:2px 0 8px 28px;cursor:pointer;" onclick="editDutyNote('${t.id}','${period}',${n?`'${esc(n.note).replace(/'/g,"\\'")}'`:"''"})">
+             ${n ? '📝 ' + esc(n.note) + ` <span style="color:#cbd5e1">(${esc(n.updated_by)})</span>` : '📝 이번 ' + (cycle==='monthly'?'달':'년도') + ' 정확한 날짜 메모 추가'}
+           </div>`
+        : (n ? `<div style="font-size:11.5px;color:#1f2937;padding:2px 0 8px 28px;">📝 ${esc(n.note)}</div>` : '');
+      return `<div class="duty-item ${c?'done':''}" style="flex-wrap:wrap;">
         <span class="cbx ${c?'checked':''}" ${canEdit()?`onclick="toggleDuty('${t.id}','${period}',${c?`'${c.id}'`:'null'})"`:''}>${c?'✓':''}</span>
         <span class="title">${esc(t.title)}</span>
         ${c?`<span class="who">${esc(c.checked_by)} · ${fmtDate(c.checked_at)}</span>`:''}
         <span class="badge ${cycle==='monthly'?'m':'y'}">${esc(t.due_label || (cycle==='monthly'?'매월':'연간'))}</span>
+        ${noteHtml}
       </div>`;
     }).join('');
   };
@@ -680,6 +690,26 @@ function renderPeriodItems(tasks){
       ${badge}
     </div>`;
   }).join('');
+}
+
+// 매월/매년 항목의 "이번 기간" 정확한 날짜·상세 메모 — 청구서 등 실제 확인 후 기록 (자동 계산 아님)
+async function editDutyNote(taskId, period, currentNote){
+  const input = prompt('이번 기간의 정확한 날짜·메모를 입력하세요 (예: 실제 납부기한 3/16(월) — 주말 겹쳐 순연)\n비워두고 확인을 누르면 메모가 삭제됩니다.', currentNote || '');
+  if(input === null) return; // 취소
+  const note = input.trim();
+  if(!note){
+    const { error } = await sb.from('hub_duty_notes').delete().eq('task_id', taskId).eq('period', period);
+    if(error){ toast('삭제 실패: ' + error.message); return; }
+    toast('메모 삭제 완료');
+  } else {
+    const { error } = await sb.from('hub_duty_notes').upsert(
+      { task_id: taskId, period, note, updated_by: myName(), updated_at: new Date().toISOString() },
+      { onConflict: 'task_id,period' }
+    );
+    if(error){ toast('저장 실패: ' + error.message); return; }
+    toast('메모 저장 완료');
+  }
+  loadDuties();
 }
 
 async function toggleDuty(taskId, period, checkId){
@@ -772,13 +802,14 @@ async function addDuty(){
   if(cycle === 'monthly'){
     const d = document.getElementById('newDutyDay').value;
     if(!d){ toast('매월 시행일을 선택해주세요.'); return; }
-    due_label = d === '말일' ? '매월 말일' : '매월 ' + d + '일';
+    // 실제 마감일은 주말·공휴일·거래처 사정으로 달라질 수 있어 "경"(대략)으로 표기 — 정확한 날짜는 매달 메모로 기록
+    due_label = d === '말일' ? '매월 말일경' : '매월 ' + d + '일경';
   }
   if(cycle === 'yearly'){
     const v = document.getElementById('newDutyDate').value;
     if(!v){ toast('시행일을 달력에서 선택해주세요.'); return; }
     const dt = v.split('-');
-    due_label = parseInt(dt[1]) + '월 ' + parseInt(dt[2]) + '일';
+    due_label = parseInt(dt[1]) + '월 ' + parseInt(dt[2]) + '일경';
   }
   const row = {
     title, cycle,
