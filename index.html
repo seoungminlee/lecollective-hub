@@ -194,7 +194,7 @@
 </header>
 
 <nav>
-  <button class="on" data-tab="home" onclick="switchTab('home',this)">🏠 홈 (운영 현황)</button>
+  <button class="on" data-tab="home" onclick="switchTab('home',this)">🏠 홈</button>
   <button data-tab="docs" onclick="switchTab('docs',this)">📁 문서보관소</button>
   <button data-tab="duty" onclick="switchTab('duty',this)">📅 주기업무</button>
   <button data-tab="admin" class="admin-only" onclick="switchTab('admin',this)">⚙️ 관리</button>
@@ -205,7 +205,7 @@
   <!-- 탭 1: 홈 -->
   <div class="tabpane on" id="home">
     <div id="homeAlertBox" style="display:none;"></div>
-    <div class="sec-title"><span class="dot" style="background:var(--amber)"></span> 시설관리 <span class="tag">담당 직군: M3</span></div>
+    <div class="sec-title"><span class="dot" style="background:var(--amber)"></span> 하자관리 대시보드 <span class="tag">담당 직군: M3</span></div>
     <div class="dash-grid">
       <div class="dash-card">
         <div class="dash-head">
@@ -351,7 +351,7 @@
 
 <footer>
   르컬렉티브 시흥 웨이브파크 통합 대시보드 · <span id="verLabel"></span><br>
-  로그인 없이는 어떤 데이터도 표시되지 않습니다 · 문의: 이성민
+  로그인 없이는 어떤 데이터도 표시되지 않습니다
 </footer>
 </div>
 
@@ -363,7 +363,7 @@
 // ============================================================
 const SUPABASE_URL = 'https://lwcutgofpdtzcbyjszhc.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx3Y3V0Z29mcGR0emNieWpzemhjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIxMzg0ODAsImV4cCI6MjA5NzcxNDQ4MH0.g2eGcEiO8Ix0Cul9wqnNghbn5snCeqjwD9LiD_-mK6I';
-const APP_VERSION = 'hub-v1.5'; // 주기업무 기한 경고, 감사 로그, 문서 버전 관리, 통합 검색
+const APP_VERSION = 'hub-v1.5.1'; // 홈 탭 명칭 단순화, 시설관리→하자관리 대시보드 표기, 푸터 문의처 제거
 let DOC_CATEGORIES = ['기타']; // 로그인 후 hub_doc_categories 테이블에서 불러옴
 const DOC_BUCKET = 'hub-docs';
 
