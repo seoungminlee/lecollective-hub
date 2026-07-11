@@ -213,13 +213,13 @@
           <a class="go-btn" href="https://seoungminlee.github.io/room-defect-dashboard/" target="_blank" rel="noopener">바로가기 →</a>
         </div>
         <div class="kpi-row">
-          <div class="kpi"><div class="v">—</div><div class="k">지표 ①<br>(추후 확정)</div></div>
-          <div class="kpi"><div class="v">—</div><div class="k">지표 ②<br>(추후 확정)</div></div>
-          <div class="kpi"><div class="v">—</div><div class="k">지표 ③<br>(추후 확정)</div></div>
-          <div class="kpi"><div class="v">—</div><div class="k">지표 ④<br>(추후 확정)</div></div>
+          <div class="kpi"><div class="v" id="m3KpiOpen">—</div><div class="k">미완료<br>하자 수</div></div>
+          <div class="kpi"><div class="v" id="m3KpiUrgent">—</div><div class="k">긴급·기한초과<br>(즉시조치 필요)</div></div>
+          <div class="kpi"><div class="v" id="m3KpiVacant">—</div><div class="k">방막 중<br>객실 수</div></div>
+          <div class="kpi"><div class="v" id="m3KpiCost">—</div><div class="k">이번 달<br>등록 비용</div></div>
         </div>
-        <div class="chart-slot">📊 그래프 영역 — 표시 항목 사용자 의견 취합 후 확정</div>
-        <div class="status-line"><span class="pulse"></span> 운영중 · 요약 지표는 항목 확정 후 연결</div>
+        <div class="chart-slot" id="m3ChartSlot" style="height:auto;min-height:100px;flex-direction:column;align-items:stretch;padding:12px;">불러오는 중…</div>
+        <div class="status-line"><span class="pulse"></span> <span id="m3StatusLine">운영중 · 요약 지표 불러오는 중…</span></div>
       </div>
     </div>
 
@@ -363,13 +363,13 @@
 // ============================================================
 const SUPABASE_URL = 'https://lwcutgofpdtzcbyjszhc.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx3Y3V0Z29mcGR0emNieWpzemhjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIxMzg0ODAsImV4cCI6MjA5NzcxNDQ4MH0.g2eGcEiO8Ix0Cul9wqnNghbn5snCeqjwD9LiD_-mK6I';
-const APP_VERSION = 'hub-v1.5.1'; // 홈 탭 명칭 단순화, 시설관리→하자관리 대시보드 표기, 푸터 문의처 제거
+const APP_VERSION = 'hub-v1.6'; // M3(하자관리) 요약 지표 4종 + 최근 6개월 비용 추이 그래프 연결
 let DOC_CATEGORIES = ['기타']; // 로그인 후 hub_doc_categories 테이블에서 불러옴
 const DOC_BUCKET = 'hub-docs';
 
 let sb = null, CURRENT_USER = null, CURRENT_ROLE = 'viewer';
 let docFilter = '전체';
-let ALERTS_DUTY = [], ALERTS_DB = [];
+let ALERTS_DUTY = [], ALERTS_DB = [], ALERTS_M3 = [];
 
 // ── 업데이트 내역 (실제 배포 이력) ──
 const HUB_UPDATE_HISTORY = [
@@ -478,11 +478,57 @@ function enterApp(){
     if(CURRENT_ROLE === 'admin') renderCatAdmin();
   });
   loadDuties();
+  loadM3Summary(); // 전 직원 공통 (홈 화면은 admin/staff/viewer 모두가 보는 화면)
   if(CURRENT_ROLE === 'admin'){
     loadDbUsage();
     loadAuditLog();
     renderUpdateHistory();
   }
+}
+
+// ── M3(하자관리) 요약 지표 — get_m3_summary() RPC 호출 ──
+function fmtWon(n){ return Math.round(n||0).toLocaleString('ko-KR') + '원'; }
+
+async function loadM3Summary(){
+  const statusEl = document.getElementById('m3StatusLine');
+  const { data, error } = await sb.rpc('get_m3_summary');
+  if(error){
+    statusEl.textContent = '요약 지표 불러오기 실패 (v35 SQL 실행 여부 확인 필요): ' + error.message;
+    document.getElementById('m3ChartSlot').textContent = '표시 불가';
+    return;
+  }
+  document.getElementById('m3KpiOpen').textContent = data.open_count ?? '—';
+  document.getElementById('m3KpiUrgent').textContent = data.urgent_overdue_count ?? '—';
+  document.getElementById('m3KpiVacant').textContent = data.vacant_rooms ?? '—';
+  document.getElementById('m3KpiCost').textContent = fmtWon(data.month_cost);
+
+  // 긴급·기한초과 건수가 있으면 홈 상단 경고 배너에도 반영
+  ALERTS_M3 = (data.urgent_overdue_count > 0)
+    ? [`🔧 <b>하자관리</b> — 긴급 또는 기한초과 하자 ${data.urgent_overdue_count}건이 있습니다.`]
+    : [];
+  renderHomeAlerts();
+
+  // 최근 6개월 비용 추이 — 간단한 막대그래프 (외부 라이브러리 없이 CSS로 표시)
+  const trend = data.monthly_trend || [];
+  const chartEl = document.getElementById('m3ChartSlot');
+  if(!trend.length){
+    chartEl.textContent = '표시할 데이터 없음';
+  } else {
+    const maxCost = Math.max(...trend.map(t => t.cost || 0), 1);
+    chartEl.innerHTML = `
+      <div style="font-size:11px;color:var(--sub);margin-bottom:8px;">📊 최근 ${trend.length}개월 등록 비용 추이</div>
+      <div style="display:flex;align-items:flex-end;gap:8px;height:70px;">
+        ${trend.map(t => {
+          const h = Math.max(4, Math.round((t.cost || 0) / maxCost * 62));
+          return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;">
+            <div title="${fmtWon(t.cost)}" style="width:100%;max-width:28px;height:${h}px;background:var(--accent);border-radius:4px 4px 0 0;"></div>
+            <div style="font-size:9.5px;color:var(--sub);margin-top:4px;">${esc(t.month.slice(5))}월</div>
+          </div>`;
+        }).join('')}
+      </div>`;
+  }
+
+  statusEl.textContent = '운영중 · 확인: ' + fmtDate(data.checked_at);
 }
 
 // ── 허브 자체 감사 로그 (부가 기능 — 실패해도 주 기능에 영향 없음) ──
@@ -522,7 +568,7 @@ function renderUpdateHistory(){
 function renderHomeAlerts(){
   const box = document.getElementById('homeAlertBox');
   if(!box) return;
-  const all = [...ALERTS_DUTY, ...ALERTS_DB];
+  const all = [...ALERTS_M3, ...ALERTS_DUTY, ...ALERTS_DB];
   if(!all.length){ box.style.display = 'none'; box.innerHTML = ''; return; }
   box.style.display = 'block';
   box.innerHTML = `<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:12px;padding:14px 16px;margin-bottom:20px;">
