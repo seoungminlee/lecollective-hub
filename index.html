@@ -322,10 +322,10 @@
         <div id="catAdminList" style="margin-top:10px;font-size:12.5px;"></div>
         <p style="margin-top:8px;">분류를 삭제해도 기존 문서는 삭제되지 않으며 「전체」에서 계속 볼 수 있습니다.</p>
       </div>
-      <div class="admin-card">
-        <h3>👥 사용자 관리</h3>
-        <p>계정 초대·권한 변경·비밀번호 초기화는 현재 <b>하자관리 시스템 → 관리자 탭</b>에서 수행합니다. (로그인 일원화 단계에서 이곳으로 이전 예정)</p>
-        <a class="btn-sm" style="display:inline-block;margin-top:8px;text-decoration:none;" href="https://seoungminlee.github.io/room-defect-dashboard/" target="_blank" rel="noopener">하자관리 관리자 탭 열기 →</a>
+      <div class="admin-card" style="grid-column:1/-1;">
+        <h3>👥 사용자 관리 <span style="font-size:11px;color:var(--sub);font-weight:400;">(하자관리·모 대시보드 공통 계정)</span></h3>
+        <button class="btn-sm" onclick="openInviteModal()">＋ 계정 초대</button>
+        <div id="userListBox" style="margin-top:12px;font-size:12.5px;">불러오는 중…</div>
       </div>
       <div class="admin-card">
         <h3>🔐 보안</h3>
@@ -335,6 +335,26 @@
         <h3>💾 DB 사용량 <span style="font-size:11px;color:var(--sub);font-weight:400;">(무료 플랜 500MB 한도)</span></h3>
         <div id="dbUsageBox">불러오는 중…</div>
         <p style="margin-top:8px;">백업 파일은 GitHub에 저장되므로 이 용량과 무관합니다. 여기 표시되는 건 실제 운영 데이터베이스 크기입니다.</p>
+      </div>
+      <div id="inviteModal" style="display:none;position:fixed;inset:0;background:rgba(30,42,68,.5);z-index:150;align-items:center;justify-content:center;padding:20px;">
+        <div style="background:#fff;border-radius:14px;padding:24px;width:100%;max-width:380px;">
+          <h3 style="font-size:15px;margin-bottom:14px;">＋ 계정 초대</h3>
+          <label style="font-size:12.5px;color:var(--sub);font-weight:600;">이메일</label>
+          <input type="email" id="inviteEmail" placeholder="name@handys.co.kr" style="width:100%;padding:9px;border:1.5px solid var(--line);border-radius:8px;margin:6px 0 12px;font-size:13px;">
+          <label style="font-size:12.5px;color:var(--sub);font-weight:600;">이름</label>
+          <input type="text" id="inviteName" placeholder="표시될 이름" style="width:100%;padding:9px;border:1.5px solid var(--line);border-radius:8px;margin:6px 0 12px;font-size:13px;">
+          <label style="font-size:12.5px;color:var(--sub);font-weight:600;">권한</label>
+          <select id="inviteRole" style="width:100%;padding:9px;border:1.5px solid var(--line);border-radius:8px;margin:6px 0 18px;font-size:13px;">
+            <option value="viewer">viewer (열람전용)</option>
+            <option value="staff">staff (직원)</option>
+            <option value="admin">admin (관리자)</option>
+          </select>
+          <div id="inviteErr" style="color:var(--red);font-size:12px;min-height:16px;margin-bottom:8px;"></div>
+          <div style="display:flex;gap:8px;justify-content:flex-end;">
+            <button class="tbl-btn" onclick="closeInviteModal()">취소</button>
+            <button id="inviteSendBtn" style="background:var(--navy);color:#fff;border:none;padding:8px 18px;border-radius:8px;font-size:12.5px;cursor:pointer;" onclick="sendInvite()">초대 발송</button>
+          </div>
+        </div>
       </div>
       <div class="admin-card" style="grid-column:1/-1;">
         <h3>📜 허브 감사 로그 <span style="font-size:11px;color:var(--sub);font-weight:400;">(문서·분류·주기업무 변경 이력 — 관리자 전용)</span></h3>
@@ -363,7 +383,7 @@
 // ============================================================
 const SUPABASE_URL = 'https://lwcutgofpdtzcbyjszhc.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx3Y3V0Z29mcGR0emNieWpzemhjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIxMzg0ODAsImV4cCI6MjA5NzcxNDQ4MH0.g2eGcEiO8Ix0Cul9wqnNghbn5snCeqjwD9LiD_-mK6I';
-const APP_VERSION = 'hub-v1.6.2'; // 월별 비용 추이 그래프에 금액 수치 표시 추가
+const APP_VERSION = 'hub-v1.7'; // 사용자 관리(초대·권한변경·비밀번호초기화·삭제) 통합 대시보드로 이전
 let DOC_CATEGORIES = ['기타']; // 로그인 후 hub_doc_categories 테이블에서 불러옴
 const DOC_BUCKET = 'hub-docs';
 
@@ -373,6 +393,14 @@ let ALERTS_DUTY = [], ALERTS_DB = [], ALERTS_M3 = [];
 
 // ── 업데이트 내역 (실제 배포 이력) ──
 const HUB_UPDATE_HISTORY = [
+  { version:'hub-v1.7', date:'2026-07-11', title:'사용자 관리 통합 대시보드로 이전', notes:[
+    '계정 초대·권한 변경·비밀번호 초기화·삭제를 통합 대시보드에서 직접 수행 (하자관리 시스템과 계정 공통이므로 관리 창구를 하나로 통합)',
+    '하자관리 고유 관리 기능(백업, 데이터 초기화, 기준정보 등)은 하자관리 시스템에 그대로 유지'
+  ]},
+  { version:'hub-v1.6', date:'2026-07-11', title:'M3(하자관리) 요약 지표 연결', notes:[
+    '미완료 하자 수 · 긴급·기한초과 건수 · 방막 중 객실 수 · 이번 달 등록 비용 실데이터 연결',
+    '최근 6개월 등록 비용 추이 그래프, 긴급·기한초과 발생 시 홈 화면 경고 배너 자동 표시'
+  ]},
   { version:'hub-v1.5', date:'2026-07-06', title:'주기업무 기한 경고 · 감사 로그 · 문서 버전 관리 · 통합 검색', notes:[
     '마감 지난 미체크 항목 자동 경고 (홈 화면 배너 + 빨간 배지)',
     '허브 자체 감사 로그 추가 — 문서·분류·주기업무 변경 이력 기록 (admin 전용 열람)',
@@ -483,7 +511,107 @@ function enterApp(){
     loadDbUsage();
     loadAuditLog();
     renderUpdateHistory();
+    loadUserList();
   }
+}
+
+// ============================================================
+// 사용자 관리 (하자관리·모 대시보드 공통 계정 — admin 전용)
+// ============================================================
+async function loadUserList(){
+  const box = document.getElementById('userListBox');
+  if(!box) return;
+  const { data, error } = await sb.rpc('admin_list_users');
+  if(error){ box.innerHTML = `<span style="color:var(--sub);">불러오기 실패: ${esc(error.message)}</span>`; return; }
+  if(!data || !data.length){ box.innerHTML = '<div style="color:#94a3b8;">등록된 계정 없음</div>'; return; }
+  box.innerHTML = `
+    <table style="font-size:12.5px;">
+      <thead><tr><th>이메일</th><th style="width:150px">권한</th><th style="width:130px">마지막 로그인</th><th style="width:100px">가입일</th><th style="width:190px"></th></tr></thead>
+      <tbody>
+        ${data.map(u => `
+          <tr>
+            <td>${esc(u.email)}</td>
+            <td>
+              <select id="roleSel_${esc(u.id)}" style="margin:0;">
+                <option value="viewer" ${u.role==='viewer'?'selected':''}>viewer</option>
+                <option value="staff" ${u.role==='staff'?'selected':''}>staff</option>
+                <option value="admin" ${u.role==='admin'?'selected':''}>admin</option>
+              </select>
+            </td>
+            <td>${u.last_sign_in ? fmtDate(u.last_sign_in) : '—'}</td>
+            <td>${fmtDate(u.created_at)}</td>
+            <td style="white-space:nowrap;">
+              <button class="tbl-btn" onclick="changeUserRole('${esc(u.id)}','${esc(u.email)}')">권한저장</button>
+              <button class="tbl-btn" onclick="resetUserPassword('${esc(u.email)}')">비번초기화</button>
+              <button class="tbl-btn danger" onclick="deleteUserAccount('${esc(u.id)}','${esc(u.email)}')">삭제</button>
+            </td>
+          </tr>`).join('')}
+      </tbody>
+    </table>`;
+}
+
+async function changeUserRole(userId, email){
+  const sel = document.getElementById('roleSel_' + userId);
+  const newRole = sel.value;
+  if(!confirm(`${email} 계정의 권한을 「${newRole}」로 변경할까요?`)) return;
+  const { error } = await sb.rpc('admin_set_user_role', { target_email: email, new_role: newRole });
+  if(error){ toast('변경 실패: ' + error.message); return; }
+  logAudit('사용자 권한 변경', email + ' → ' + newRole);
+  toast('권한 변경 완료');
+  loadUserList();
+}
+
+function genTempPassword(){
+  // 8자 이상, 영문+숫자 포함 (M3 비밀번호 정책과 동일)
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+  let pw = '';
+  for(let i = 0; i < 10; i++) pw += chars[Math.floor(Math.random() * chars.length)];
+  return pw;
+}
+
+async function resetUserPassword(email){
+  if(!confirm(`${email} 계정의 비밀번호를 초기화할까요?\n초기화 후 임시 비밀번호가 화면에 한 번만 표시됩니다.`)) return;
+  const tempPw = genTempPassword();
+  const { error } = await sb.rpc('admin_reset_user_password', { target_email: email, new_password: tempPw });
+  if(error){ toast('초기화 실패: ' + error.message); return; }
+  logAudit('사용자 비밀번호 초기화', email);
+  alert(`임시 비밀번호가 발급되었습니다.\n\n계정: ${email}\n임시 비밀번호: ${tempPw}\n\n이 비밀번호를 해당 직원에게 안전하게 전달해주세요. (다시 확인할 수 없습니다)`);
+  toast('비밀번호 초기화 완료');
+}
+
+async function deleteUserAccount(userId, email){
+  if(!confirm(`${email} 계정을 삭제할까요?\n되돌릴 수 없습니다.`)) return;
+  const { data, error } = await sb.functions.invoke('delete-user', { body: { userId } });
+  if(error || data?.error){ toast('삭제 실패: ' + (data?.error || error.message)); return; }
+  logAudit('사용자 계정 삭제', email);
+  toast('삭제 완료');
+  loadUserList();
+}
+
+function openInviteModal(){
+  document.getElementById('inviteEmail').value = '';
+  document.getElementById('inviteName').value = '';
+  document.getElementById('inviteRole').value = 'viewer';
+  document.getElementById('inviteErr').textContent = '';
+  document.getElementById('inviteModal').style.display = 'flex';
+}
+function closeInviteModal(){ document.getElementById('inviteModal').style.display = 'none'; }
+
+async function sendInvite(){
+  const email = document.getElementById('inviteEmail').value.trim();
+  const displayName = document.getElementById('inviteName').value.trim();
+  const role = document.getElementById('inviteRole').value;
+  const errEl = document.getElementById('inviteErr');
+  if(!email || !displayName){ errEl.textContent = '이메일과 이름을 모두 입력해주세요.'; return; }
+  const btn = document.getElementById('inviteSendBtn');
+  btn.disabled = true; btn.textContent = '발송 중…';
+  const { data, error } = await sb.functions.invoke('invite-user', { body: { email, displayName, role } });
+  btn.disabled = false; btn.textContent = '초대 발송';
+  if(error || data?.error){ errEl.textContent = '초대 실패: ' + (data?.error || error.message); return; }
+  logAudit('사용자 계정 초대', email + ' (' + role + ')');
+  closeInviteModal();
+  toast('초대 발송 완료');
+  loadUserList();
 }
 
 // ── M3(하자관리) 요약 지표 — get_m3_summary() RPC 호출 ──
