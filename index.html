@@ -72,9 +72,9 @@
   .go-btn{background:var(--accent);color:#fff;border:none;padding:8px 14px;border-radius:9px;font-size:12.5px;font-weight:600;cursor:pointer;flex-shrink:0;text-decoration:none;display:inline-block;}
   .go-btn.gray{background:#cbd5e1;cursor:default;}
   .kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px;}
-  .kpi{background:#f8fafc;border:1px solid var(--line);border-radius:10px;padding:10px 8px;text-align:center;}
-  .kpi .v{font-size:19px;font-weight:800;color:#94a3b8;}
-  .kpi .k{font-size:10.5px;color:var(--sub);margin-top:4px;line-height:1.35;}
+  .kpi{background:#f8fafc;border:1.5px solid var(--line);border-radius:10px;padding:12px 8px;text-align:center;transition:background .2s,border-color .2s;}
+  .kpi .v{font-size:22px;font-weight:800;color:#94a3b8;line-height:1.2;}
+  .kpi .k{font-size:11px;color:var(--sub);margin-top:5px;line-height:1.35;font-weight:600;}
   .chart-slot{border:1.5px dashed #cbd5e1;border-radius:10px;height:100px;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:12px;background:#fafbfd;}
   .status-line{margin-top:10px;font-size:11.5px;color:var(--sub);display:flex;gap:6px;align-items:center;flex-wrap:wrap;}
   .pulse{width:7px;height:7px;border-radius:50%;background:var(--green);}
@@ -363,7 +363,7 @@
 // ============================================================
 const SUPABASE_URL = 'https://lwcutgofpdtzcbyjszhc.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx3Y3V0Z29mcGR0emNieWpzemhjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIxMzg0ODAsImV4cCI6MjA5NzcxNDQ4MH0.g2eGcEiO8Ix0Cul9wqnNghbn5snCeqjwD9LiD_-mK6I';
-const APP_VERSION = 'hub-v1.6'; // M3(하자관리) 요약 지표 4종 + 최근 6개월 비용 추이 그래프 연결
+const APP_VERSION = 'hub-v1.6.1'; // KPI 카드 시인성 개선 (색상·배경 대비 강화)
 let DOC_CATEGORIES = ['기타']; // 로그인 후 hub_doc_categories 테이블에서 불러옴
 const DOC_BUCKET = 'hub-docs';
 
@@ -497,10 +497,21 @@ async function loadM3Summary(){
     document.getElementById('m3ChartSlot').textContent = '표시 불가';
     return;
   }
-  document.getElementById('m3KpiOpen').textContent = data.open_count ?? '—';
-  document.getElementById('m3KpiUrgent').textContent = data.urgent_overdue_count ?? '—';
-  document.getElementById('m3KpiVacant').textContent = data.vacant_rooms ?? '—';
-  document.getElementById('m3KpiCost').textContent = fmtWon(data.month_cost);
+  // 값이 채워지면 회색(대기중) → 진한 색으로 전환 + 상태에 따라 색상·배경 구분 (한눈에 심각도 파악)
+  const setKpi = (id, text, color, bg) => {
+    const el = document.getElementById(id);
+    el.textContent = text; el.style.color = color; el.style.fontWeight = '800';
+    const box = el.closest('.kpi');
+    if(box){ box.style.background = bg || '#f8fafc'; box.style.borderColor = bg ? color : 'var(--line)'; }
+  };
+  setKpi('m3KpiOpen', data.open_count ?? '—', 'var(--navy)');
+  setKpi('m3KpiUrgent', data.urgent_overdue_count ?? '—',
+    data.urgent_overdue_count > 0 ? 'var(--red)' : 'var(--green)',
+    data.urgent_overdue_count > 0 ? '#fef2f2' : '#ecfdf5');
+  setKpi('m3KpiVacant', data.vacant_rooms ?? '—',
+    data.vacant_rooms > 0 ? '#b45309' : 'var(--green)',
+    data.vacant_rooms > 0 ? '#fffbeb' : '#ecfdf5');
+  setKpi('m3KpiCost', fmtWon(data.month_cost), 'var(--navy)');
 
   // 긴급·기한초과 건수가 있으면 홈 상단 경고 배너에도 반영
   ALERTS_M3 = (data.urgent_overdue_count > 0)
