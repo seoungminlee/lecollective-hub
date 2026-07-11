@@ -363,7 +363,7 @@
 // ============================================================
 const SUPABASE_URL = 'https://lwcutgofpdtzcbyjszhc.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx3Y3V0Z29mcGR0emNieWpzemhjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIxMzg0ODAsImV4cCI6MjA5NzcxNDQ4MH0.g2eGcEiO8Ix0Cul9wqnNghbn5snCeqjwD9LiD_-mK6I';
-const APP_VERSION = 'hub-v1.6.1'; // KPI 카드 시인성 개선 (색상·배경 대비 강화)
+const APP_VERSION = 'hub-v1.6.2'; // 월별 비용 추이 그래프에 금액 수치 표시 추가
 let DOC_CATEGORIES = ['기타']; // 로그인 후 hub_doc_categories 테이블에서 불러옴
 const DOC_BUCKET = 'hub-docs';
 
@@ -528,11 +528,12 @@ async function loadM3Summary(){
     const maxCost = Math.max(...trend.map(t => t.cost || 0), 1);
     chartEl.innerHTML = `
       <div style="font-size:11px;color:var(--sub);margin-bottom:8px;">📊 최근 ${trend.length}개월 등록 비용 추이</div>
-      <div style="display:flex;align-items:flex-end;gap:8px;height:70px;">
+      <div style="display:flex;align-items:flex-end;gap:8px;height:92px;">
         ${trend.map(t => {
-          const h = Math.max(4, Math.round((t.cost || 0) / maxCost * 62));
+          const h = Math.max(4, Math.round((t.cost || 0) / maxCost * 56));
           return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;">
-            <div title="${fmtWon(t.cost)}" style="width:100%;max-width:28px;height:${h}px;background:var(--accent);border-radius:4px 4px 0 0;"></div>
+            <div style="font-size:10.5px;font-weight:700;color:var(--navy);margin-bottom:4px;white-space:nowrap;">${fmtWon(t.cost)}</div>
+            <div style="width:100%;max-width:28px;height:${h}px;background:var(--accent);border-radius:4px 4px 0 0;"></div>
             <div style="font-size:9.5px;color:var(--sub);margin-top:4px;">${esc(t.month.slice(5))}월</div>
           </div>`;
         }).join('')}
