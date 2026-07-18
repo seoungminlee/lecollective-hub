@@ -73,8 +73,12 @@
   .go-btn.gray{background:#cbd5e1;cursor:default;}
   .kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px;}
   .kpi{background:#f8fafc;border:1.5px solid var(--line);border-radius:10px;padding:12px 8px;text-align:center;transition:background .2s,border-color .2s;}
+  .kpi.clickable{cursor:pointer;}
+  .kpi.clickable:hover{background:#eef2f8;border-color:var(--accent);}
   .kpi .v{font-size:22px;font-weight:800;color:#94a3b8;line-height:1.2;}
-  .kpi .k{font-size:11px;color:var(--sub);margin-top:5px;line-height:1.35;font-weight:600;}
+  .kpi .k{font-size:11px;color:var(--sub);margin-top:5px;line-height:1.35;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .chart-slot.clickable{cursor:pointer;transition:background .2s;}
+  .chart-slot.clickable:hover{background:#f4f7fc;}
   .chart-slot{border:1.5px dashed #cbd5e1;border-radius:10px;height:100px;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:12px;background:#fafbfd;}
   .status-line{margin-top:10px;font-size:11.5px;color:var(--sub);display:flex;gap:6px;align-items:center;flex-wrap:wrap;}
   .pulse{width:7px;height:7px;border-radius:50%;background:var(--green);}
@@ -214,12 +218,12 @@
           <a class="go-btn" href="https://seoungminlee.github.io/room-defect-dashboard/" target="_blank" rel="noopener">바로가기 →</a>
         </div>
         <div class="kpi-row">
-          <div class="kpi"><div class="v" id="m3KpiOpen">—</div><div class="k">미완료<br>하자 수</div></div>
-          <div class="kpi"><div class="v" id="m3KpiUrgent">—</div><div class="k">긴급·기한초과<br>(즉시조치 필요)</div></div>
-          <div class="kpi"><div class="v" id="m3KpiVacant">—</div><div class="k">방막 중<br>객실 수</div></div>
-          <div class="kpi"><div class="v" id="m3KpiCost">—</div><div class="k">이번 달<br>등록 비용</div></div>
+          <div class="kpi clickable" onclick="openM3('rooms')" title="하자 목록 열기"><div class="v" id="m3KpiOpen">—</div><div class="k">미완료 하자 수</div></div>
+          <div class="kpi clickable" onclick="openM3('rooms')" title="하자 목록 열기 · 긴급·기한초과 (즉시조치 필요)"><div class="v" id="m3KpiUrgent">—</div><div class="k">긴급·기한초과</div></div>
+          <div class="kpi clickable" onclick="openM3('rooms')" title="하자 목록 열기"><div class="v" id="m3KpiVacant">—</div><div class="k">방막 중 객실 수</div></div>
+          <div class="kpi clickable" onclick="openM3('coststat')" title="비용통계 열기"><div class="v" id="m3KpiCost">—</div><div class="k">이번 달 등록 비용</div></div>
         </div>
-        <div class="chart-slot" id="m3ChartSlot" style="height:auto;min-height:100px;flex-direction:column;align-items:stretch;padding:12px;">불러오는 중…</div>
+        <div class="chart-slot clickable" id="m3ChartSlot" onclick="openM3('coststat')" title="비용통계 열기" style="height:auto;min-height:100px;flex-direction:column;align-items:stretch;padding:12px;">불러오는 중…</div>
         <div class="status-line"><span class="pulse"></span> <span id="m3StatusLine">운영중 · 요약 지표 불러오는 중…</span></div>
       </div>
     </div>
@@ -382,9 +386,11 @@
 // ============================================================
 // 설정 — 하자관리 시스템(M3)과 같은 Supabase 프로젝트 (계정 공통)
 // ============================================================
+const M3_URL = 'https://seoungminlee.github.io/room-defect-dashboard/';
+function openM3(tab){ window.open(M3_URL + '#' + tab, '_blank'); }
 const SUPABASE_URL = 'https://lwcutgofpdtzcbyjszhc.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx3Y3V0Z29mcGR0emNieWpzemhjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIxMzg0ODAsImV4cCI6MjA5NzcxNDQ4MH0.g2eGcEiO8Ix0Cul9wqnNghbn5snCeqjwD9LiD_-mK6I';
-const APP_VERSION = 'hub-v1.7.1'; // 관리 탭 카드 배열(빈 공간) 수정
+const APP_VERSION = 'hub-v1.8'; // M3 KPI 카드 클릭 시 하자관리로 바로가기 + 라벨 한 줄 표시
 let DOC_CATEGORIES = ['기타']; // 로그인 후 hub_doc_categories 테이블에서 불러옴
 const DOC_BUCKET = 'hub-docs';
 
@@ -394,6 +400,10 @@ let ALERTS_DUTY = [], ALERTS_DB = [], ALERTS_M3 = [];
 
 // ── 업데이트 내역 (실제 배포 이력) ──
 const HUB_UPDATE_HISTORY = [
+  { version:'hub-v1.8', date:'2026-07-18', title:'M3 KPI 카드 바로가기 · 라벨 한 줄 표시', notes:[
+    '미완료 하자 수·긴급기한초과·방막 중 객실 수 카드 클릭 시 하자관리 시스템 「하자 목록」으로, 이번 달 등록 비용 카드·추이 그래프 클릭 시 「비용통계」로 새 탭 이동',
+    '"방막 중 / 객실 수"처럼 두 줄로 줄바꿈되던 카드 라벨을 한 줄로 표시 (넘칠 경우 말줄임, 전체 텍스트는 마우스오버 시 표시)'
+  ]},
   { version:'hub-v1.7.1', date:'2026-07-11', title:'관리 탭 카드 배열 수정', notes:[
     '주기업무 항목 관리 / 문서 분류 관리 카드가 화면 폭에 따라 옆에 빈 공간을 남기던 문제 수정 (2열 고정 배열로 변경)'
   ]},
