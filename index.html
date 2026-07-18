@@ -164,7 +164,6 @@
     <input type="password" id="loginPassword" placeholder="비밀번호" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
     <button class="btn-login" id="loginBtn" onclick="doLogin()">로그인</button>
     <div id="loginErr"></div>
-    <div class="login-note">계정은 하자관리 시스템과 공통입니다.<br>계정 문의: 관리자 (이성민)</div>
   </div>
 </div>
 
@@ -402,7 +401,7 @@ const RETURN_URL = (() => {
 
 const SUPABASE_URL = 'https://lwcutgofpdtzcbyjszhc.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx3Y3V0Z29mcGR0emNieWpzemhjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIxMzg0ODAsImV4cCI6MjA5NzcxNDQ4MH0.g2eGcEiO8Ix0Cul9wqnNghbn5snCeqjwD9LiD_-mK6I';
-const APP_VERSION = 'hub-v1.9'; // 로그인 창구 일원화 준비 — return-url 복귀 지원
+const APP_VERSION = 'hub-v1.9.1'; // 로그인 화면 하단 안내문구 제거
 let DOC_CATEGORIES = ['기타']; // 로그인 후 hub_doc_categories 테이블에서 불러옴
 const DOC_BUCKET = 'hub-docs';
 
@@ -412,6 +411,9 @@ let ALERTS_DUTY = [], ALERTS_DB = [], ALERTS_M3 = [];
 
 // ── 업데이트 내역 (실제 배포 이력) ──
 const HUB_UPDATE_HISTORY = [
+  { version:'hub-v1.9.1', date:'2026-07-18', title:'로그인 화면 안내문구 제거', notes:[
+    '로그인 화면 하단 "계정은 하자관리 시스템과 공통입니다 / 계정 문의: 관리자" 문구 삭제'
+  ]},
   { version:'hub-v1.9', date:'2026-07-18', title:'로그인 창구 일원화 준비 (return-url 복귀)', notes:[
     'M3 등에서 ?return=원래주소 로 넘어온 경우 로그인 완료 후 허브 화면을 거치지 않고 원래 보려던 화면으로 자동 복귀',
     '보안: 같은 오리진(seoungminlee.github.io)으로만 복귀를 허용해 오픈 리다이렉트 악용을 방지',
