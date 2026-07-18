@@ -388,9 +388,21 @@
 // ============================================================
 const M3_URL = 'https://seoungminlee.github.io/room-defect-dashboard/';
 function openM3(tab){ window.open(M3_URL + '#' + tab, '_blank'); }
+
+// ── 로그인 창구 일원화: M3 등에서 ?return=원래주소 로 넘어온 경우, 로그인 완료 후 그 주소로 복귀 ──
+// 보안: 같은 오리진(seoungminlee.github.io)으로만 복귀 허용 — 임의 외부 사이트로 되돌리는 오픈 리다이렉트 방지
+const RETURN_URL = (() => {
+  try {
+    const raw = new URLSearchParams(location.search).get('return');
+    if(!raw) return null;
+    const u = new URL(raw);
+    return u.origin === location.origin ? raw : null;
+  } catch(e){ return null; }
+})();
+
 const SUPABASE_URL = 'https://lwcutgofpdtzcbyjszhc.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx3Y3V0Z29mcGR0emNieWpzemhjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIxMzg0ODAsImV4cCI6MjA5NzcxNDQ4MH0.g2eGcEiO8Ix0Cul9wqnNghbn5snCeqjwD9LiD_-mK6I';
-const APP_VERSION = 'hub-v1.8'; // M3 KPI 카드 클릭 시 하자관리로 바로가기 + 라벨 한 줄 표시
+const APP_VERSION = 'hub-v1.9'; // 로그인 창구 일원화 준비 — return-url 복귀 지원
 let DOC_CATEGORIES = ['기타']; // 로그인 후 hub_doc_categories 테이블에서 불러옴
 const DOC_BUCKET = 'hub-docs';
 
@@ -400,6 +412,11 @@ let ALERTS_DUTY = [], ALERTS_DB = [], ALERTS_M3 = [];
 
 // ── 업데이트 내역 (실제 배포 이력) ──
 const HUB_UPDATE_HISTORY = [
+  { version:'hub-v1.9', date:'2026-07-18', title:'로그인 창구 일원화 준비 (return-url 복귀)', notes:[
+    'M3 등에서 ?return=원래주소 로 넘어온 경우 로그인 완료 후 허브 화면을 거치지 않고 원래 보려던 화면으로 자동 복귀',
+    '보안: 같은 오리진(seoungminlee.github.io)으로만 복귀를 허용해 오픈 리다이렉트 악용을 방지',
+    'M3 쪽은 REQUIRE_HUB_LOGIN 플래그가 꺼져 있어 아직 실제 전환은 되지 않음 — 직원 공지 이후 켤 예정'
+  ]},
   { version:'hub-v1.8', date:'2026-07-18', title:'M3 KPI 카드 바로가기 · 라벨 한 줄 표시', notes:[
     '미완료 하자 수·긴급기한초과·방막 중 객실 수 카드 클릭 시 하자관리 시스템 「하자 목록」으로, 이번 달 등록 비용 카드·추이 그래프 클릭 시 「비용통계」로 새 탭 이동',
     '"방막 중 / 객실 수"처럼 두 줄로 줄바꿈되던 카드 라벨을 한 줄로 표시 (넘칠 경우 말줄임, 전체 텍스트는 마우스오버 시 표시)'
@@ -502,6 +519,8 @@ function onLoginSuccess(user){
 }
 
 function enterApp(){
+  // 로그인 창구 일원화: M3 등에서 return 주소를 달고 왔으면, 허브를 그리지 않고 바로 원래 화면으로 복귀
+  if(RETURN_URL){ location.href = RETURN_URL; return; }
   document.getElementById('loginScreen').style.display = 'none';
   document.getElementById('pwChangeScreen').style.display = 'none';
   document.getElementById('appRoot').style.display = 'block';
