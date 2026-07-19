@@ -133,13 +133,25 @@
     .kpi-row{grid-template-columns:repeat(2,1fr);}
     .duty-grid{grid-template-columns:1fr;}
     .admin-grid{grid-template-columns:1fr;}
-    .brand h1{font-size:13.5px;}
-    nav{padding:0 10px;}
     .upload-btn{margin-left:0;}
     /* v1.9.3: 모바일 탭 영역 확대 — 주기업무 체크박스(18px)·문서함 버튼이 손가락 터치 기준으로 작아 오탭 유발하던 문제 */
     .cbx{width:26px;height:26px;}
     .duty-item{padding:12px 4px;gap:12px;}
     .tbl-btn{padding:8px 12px;font-size:13px;margin:2px 6px 2px 0;}
+
+    /* v1.9.4: 모바일 헤더가 60px 고정 높이 안에 로고+긴 브랜드명+검색창+사용자칩+로그아웃까지
+       한 줄로 욱여넣도록 돼있어, 좁은 화면에서 글자가 조각조각 줄바꿈되고 요소끼리 겹치던 문제.
+       헤더 높이를 내용에 맞춰 자동으로 늘리고, 부제(작은 글씨)는 숨기고, 검색창은 모바일에서 잠시 숨김. */
+    header{height:auto;min-height:56px;padding:10px 14px;flex-wrap:wrap;row-gap:8px;}
+    .brand{gap:8px;min-width:0;}
+    .brand .logo{width:28px;height:28px;font-size:13px;flex-shrink:0;}
+    .brand h1{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .brand small{display:none;}
+    .user-area{gap:6px;flex-shrink:0;}
+    .user-chip{padding:5px 9px;font-size:11px;}
+    .btn-ghost{padding:5px 9px;font-size:11px;}
+    .search-wrap{display:none;} /* 모바일에서는 화면 공간 확보를 위해 통합 검색을 숨김 (PC는 그대로 노출) */
+    nav{position:static;top:auto;padding:0 10px;} /* 헤더 높이가 가변으로 바뀌어 sticky 고정 위치(top:60px)와 어긋나던 것 방지 */
   }
 </style>
 </head>
@@ -405,7 +417,7 @@ const RETURN_URL = (() => {
 
 const SUPABASE_URL = 'https://lwcutgofpdtzcbyjszhc.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx3Y3V0Z29mcGR0emNieWpzemhjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIxMzg0ODAsImV4cCI6MjA5NzcxNDQ4MH0.g2eGcEiO8Ix0Cul9wqnNghbn5snCeqjwD9LiD_-mK6I';
-const APP_VERSION = 'hub-v1.9.3'; // 모바일 탭 영역 확대
+const APP_VERSION = 'hub-v1.9.4'; // 모바일 헤더 깨짐 수정
 let DOC_CATEGORIES = ['기타']; // 로그인 후 hub_doc_categories 테이블에서 불러옴
 const DOC_BUCKET = 'hub-docs';
 
@@ -415,6 +427,9 @@ let ALERTS_DUTY = [], ALERTS_DB = [], ALERTS_M3 = [];
 
 // ── 업데이트 내역 (실제 배포 이력) ──
 const HUB_UPDATE_HISTORY = [
+  { version:'hub-v1.9.4', date:'2026-07-19', title:'모바일 헤더 깨짐 수정', notes:[
+    '모바일에서 상단 헤더(로고+브랜드명+검색창+사용자정보+로그아웃)가 60px 고정 높이 한 줄에 다 들어가도록 돼있어, 글자가 조각조각 줄바꿈되고 요소끼리 겹치던 문제 — 헤더 높이를 내용에 맞춰 자동으로 늘어나게 바꾸고, 부제(작은 글씨)는 숨기고, 통합검색은 모바일 화면 폭 확보를 위해 잠정적으로 숨김 처리 (PC 화면은 기존과 동일)'
+  ]},
   { version:'hub-v1.9.3', date:'2026-07-19', title:'모바일 탭 영역 확대', notes:[
     '주기업무 체크리스트 체크박스(18px)와 문서보관소 버튼(열람·새 버전·이력·삭제)이 모바일에서 손가락으로 누르기엔 작고 다닥다닥 붙어있어 오탭 위험이 있던 문제 — 모바일 화면에서만 체크박스를 26px로 키우고 버튼 간격·크기를 넉넉하게 조정 (데스크톱 화면은 기존 그대로 유지)'
   ]},
