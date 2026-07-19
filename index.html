@@ -136,6 +136,10 @@
     .brand h1{font-size:13.5px;}
     nav{padding:0 10px;}
     .upload-btn{margin-left:0;}
+    /* v1.9.3: 모바일 탭 영역 확대 — 주기업무 체크박스(18px)·문서함 버튼이 손가락 터치 기준으로 작아 오탭 유발하던 문제 */
+    .cbx{width:26px;height:26px;}
+    .duty-item{padding:12px 4px;gap:12px;}
+    .tbl-btn{padding:8px 12px;font-size:13px;margin:2px 6px 2px 0;}
   }
 </style>
 </head>
@@ -401,7 +405,7 @@ const RETURN_URL = (() => {
 
 const SUPABASE_URL = 'https://lwcutgofpdtzcbyjszhc.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx3Y3V0Z29mcGR0emNieWpzemhjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIxMzg0ODAsImV4cCI6MjA5NzcxNDQ4MH0.g2eGcEiO8Ix0Cul9wqnNghbn5snCeqjwD9LiD_-mK6I';
-const APP_VERSION = 'hub-v1.9.2'; // KPI 라벨 가독성 개선
+const APP_VERSION = 'hub-v1.9.3'; // 모바일 탭 영역 확대
 let DOC_CATEGORIES = ['기타']; // 로그인 후 hub_doc_categories 테이블에서 불러옴
 const DOC_BUCKET = 'hub-docs';
 
@@ -411,6 +415,9 @@ let ALERTS_DUTY = [], ALERTS_DB = [], ALERTS_M3 = [];
 
 // ── 업데이트 내역 (실제 배포 이력) ──
 const HUB_UPDATE_HISTORY = [
+  { version:'hub-v1.9.3', date:'2026-07-19', title:'모바일 탭 영역 확대', notes:[
+    '주기업무 체크리스트 체크박스(18px)와 문서보관소 버튼(열람·새 버전·이력·삭제)이 모바일에서 손가락으로 누르기엔 작고 다닥다닥 붙어있어 오탭 위험이 있던 문제 — 모바일 화면에서만 체크박스를 26px로 키우고 버튼 간격·크기를 넉넉하게 조정 (데스크톱 화면은 기존 그대로 유지)'
+  ]},
   { version:'hub-v1.9.2', date:'2026-07-19', title:'KPI 라벨 가독성 개선', notes:[
     '"미완료 하자 수" 등 KPI 카드 하단 라벨 글자가 작고(11px) 저대비 회색이라 숫자보다 잘 안 읽히던 문제 — 글자 크기(12px)와 색상 대비를 높여 개선'
   ]},
